@@ -63,8 +63,19 @@ await scraper.login(
   process.env.TWITTER_EMAIL!,
 );
 
-const created = await scraper.createTweet("Hello from twitter-scraper!", {
-  quoteTweetId: "1234567890123456789",
+// Standalone tweet
+const created = await scraper.createTweet("Hello from twitter-scraper!");
+console.log(created.id, created.text);
+
+// Reply
+const reply = await scraper.createTweet("Replying with createTweet", {
+  reply: { inReplyToTweetId: "1234567890123456789" },
+});
+console.log(reply.id, reply.text);
+
+// Quote tweet with media
+const quote = await scraper.createTweet("Quoting with media", {
+  quoteTweetId: "9876543210987654321",
   media: {
     mediaEntities: [
       {
@@ -73,8 +84,7 @@ const created = await scraper.createTweet("Hello from twitter-scraper!", {
     ],
   },
 });
-
-console.log(created.id, created.text);
+console.log(quote.id, quote.text);
 ```
 
 The second argument accepts the same optional properties that the X/Twitter web
@@ -82,6 +92,24 @@ client sends to GraphQL for tweet creation, such as `attachmentUrl`,
 `quoteTweetId`, reply targeting via `reply`, and media tagging through
 `media.mediaEntities`. Supplying these values is optional—`scraper.createTweet`
 only requires the tweet text when no extra behavior is needed.
+
+#### Migrating from `sendTweet` / `sendQuoteTweet`
+
+Older code that called `scraper.sendTweet` or `scraper.sendQuoteTweet` can be
+rewritten to use `createTweet` directly by switching the branching logic to pass
+different option objects:
+
+```ts
+const created = await scraper.createTweet(reply, replyOrQuote
+  ? { reply: { inReplyToTweetId: tweetId } }
+  : { quoteTweetId: tweetId },
+);
+
+console.log(created.id, created.text);
+```
+
+For a more complete example that mirrors the original imperative control flow,
+see [`examples/create-tweet.ts`](examples/create-tweet.ts).
 
 ### Browser usage
 
