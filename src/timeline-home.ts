@@ -1,11 +1,13 @@
 import { requestApi } from './api';
+import { apiRequestFactory } from './api-data';
 import { TwitterAuth } from './auth';
 import { AuthenticationError } from './errors';
+import { QueryTweetsResponse } from './timeline-v1';
 import {
-  parseTimelineTweetsV1,
-  QueryTweetsResponse,
-  TimelineV1,
-} from './timeline-v1';
+  parseTimelineTweetsV2,
+  TimelineInstruction,
+  TimelineV2,
+} from './timeline-v2';
 
 interface HomeTimelineOptions {
   maxTweets: number;
@@ -13,58 +15,20 @@ interface HomeTimelineOptions {
   timelineType?: 'home' | 'latest';
 }
 
-const HOME_TIMELINE_ENDPOINT = 'https://x.com/i/api/2/timeline/home.json';
-const MAX_HOME_TWEETS = 100;
-
-function createHomeTimelineParams({
-  maxTweets,
-  cursor,
-  timelineType,
-}: HomeTimelineOptions): URLSearchParams {
-  const params = new URLSearchParams();
-
-  params.set('count', String(Math.min(maxTweets, MAX_HOME_TWEETS)));
-  params.set('include_profile_interstitial_type', '1');
-  params.set('include_blocking', '1');
-  params.set('include_blocked_by', '1');
-  params.set('include_followed_by', '1');
-  params.set('include_want_retweets', '1');
-  params.set('include_mute_edge', '1');
-  params.set('include_can_dm', '1');
-  params.set('include_can_media_tag', '1');
-  params.set('include_cards', '1');
-  params.set('include_ext_alt_text', 'true');
-  params.set('include_quote_count', 'true');
-  params.set('include_reply_count', '1');
-  params.set('tweet_mode', 'extended');
-  params.set('simple_quoted_tweet', 'true');
-  params.set('include_ext_has_birdwatch_notes', 'true');
-  params.set('include_ext_edit_control', 'true');
-  params.set('include_ext_media_color', 'true');
-  params.set('include_ext_media_availability', 'true');
-  params.set('include_ext_sensitive_media_warning', 'true');
-  params.set('include_ext_trusted_friends_metadata', 'true');
-  params.set('include_ext_verified_type', 'true');
-  params.set('include_ext_is_blue_verified', 'true');
-  params.set('withCommunity', 'true');
-  params.set('withDownvotePerspective', 'true');
-  params.set('withTweetQuoteCount', 'true');
-  params.set('withTweetResult', 'true');
-  params.set('withBirdwatchNotes', 'true');
-  params.set('withVoice', 'true');
-  params.set('withV2Timeline', 'true');
-  params.set('includePromotedContent', 'false');
-
-  if (cursor) {
-    params.set('cursor', cursor);
-  }
-
-  if (timelineType) {
-    params.set('timeline_type', timelineType);
-  }
-
-  return params;
+interface HomeTimelineUrt {
+  instructions?: TimelineInstruction[];
 }
+
+interface HomeTimelineResponse {
+  data?: {
+    home?: {
+      home_timeline_urt?: HomeTimelineUrt;
+      latest_home_timeline_urt?: HomeTimelineUrt;
+    };
+  };
+}
+
+const MAX_HOME_TWEETS = 100;
 
 async function fetchHomeTimelineInternal(
   auth: TwitterAuth,
@@ -74,9 +38,27 @@ async function fetchHomeTimelineInternal(
     throw new AuthenticationError('Scraper is not logged-in for home timeline.');
   }
 
-  const params = createHomeTimelineParams(options);
-  const res = await requestApi<TimelineV1>(
-    `${HOME_TIMELINE_ENDPOINT}?${params.toString()}`,
+  const request = apiRequestFactory.createHomeTimelineRequest();
+  request.variables ??= {};
+  const variables = request.variables as Record<string, any>;
+  variables.count = Math.min(options.maxTweets, MAX_HOME_TWEETS);
+  variables.includePromotedContent = false;
+  variables.withCommunity = true;
+  variables.latestControlAvailable = true;
+  variables.requestContext = variables.requestContext ?? 'launch';
+
+  if (options.cursor) {
+    variables.cursor = options.cursor;
+  }
+
+  if (options.timelineType === 'latest') {
+    variables.timelineType = 'latest';
+  } else {
+    delete variables.timelineType;
+  }
+
+  const res = await requestApi<HomeTimelineResponse>(
+    request.toRequestUrl(),
     auth,
   );
 
@@ -84,7 +66,27 @@ async function fetchHomeTimelineInternal(
     throw res.err;
   }
 
-  return parseTimelineTweetsV1(res.value);
+  const home = res.value.data?.home;
+  const instructions =
+    home?.home_timeline_urt?.instructions ??
+    home?.latest_home_timeline_urt?.instructions ??
+    [];
+
+  const timeline = {
+    data: {
+      user: {
+        result: {
+          timeline: {
+            timeline: {
+              instructions,
+            },
+          },
+        },
+      },
+    },
+  } as TimelineV2;
+
+  return parseTimelineTweetsV2(timeline);
 }
 
 export function fetchHomeTimeline(
@@ -92,7 +94,7 @@ export function fetchHomeTimeline(
   auth: TwitterAuth,
   cursor?: string,
 ): Promise<QueryTweetsResponse> {
-  return fetchHomeTimelineInternal(auth, { maxTweets, cursor, timelineType: 'home' });
+  return fetchHomeTimelineInternal(auth, { maxTweets, cursor });
 }
 
 export function fetchFollowingTimeline(
