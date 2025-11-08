@@ -55,13 +55,15 @@ export async function requestApi<T>(
   url: string,
   auth: TwitterAuth,
   method: 'GET' | 'POST' = 'GET',
-  platform: PlatformExtensions = new Platform(),
+  platform?: PlatformExtensions,
   headers: Headers = new Headers(),
+  body?: BodyInit | null,
 ): Promise<RequestApiResult<T>> {
   log(`Making ${method} request to ${url}`);
 
   await auth.installTo(headers, url);
-  await platform.randomizeCiphers();
+  const platformExtensions = platform ?? new Platform();
+  await platformExtensions.randomizeCiphers();
 
   let res: Response;
   do {
@@ -71,6 +73,7 @@ export async function requestApi<T>(
         method,
         headers,
         credentials: 'include',
+        body: body ?? undefined,
       },
     ];
 

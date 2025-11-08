@@ -48,6 +48,7 @@ export {
 export { Scraper, type ScraperOptions } from './scraper';
 export { SearchMode } from './search';
 export type { QueryProfilesResponse, QueryTweetsResponse } from './timeline-v1';
+export { createTweet } from './tweets';
 export type {
   Tweet,
   TweetQuery,
@@ -55,4 +56,8 @@ export type {
   Photo,
   PlaceRaw,
   Video,
+  CreateTweetOptions,
+  CreateTweetMediaEntity,
+  CreateTweetMediaOptions,
+  CreateTweetReplyOptions,
 } from './tweets';
