@@ -36,6 +36,10 @@ import {
   createTweet,
   CreateTweetOptions,
 } from './tweets';
+import {
+  fetchFollowingTimeline,
+  fetchHomeTimeline,
+} from './timeline-home';
 import fetch from 'cross-fetch';
 import { RateLimitStrategy } from './rate-limit';
 import {
@@ -214,6 +218,32 @@ export class Scraper {
     cursor?: string,
   ): Promise<QueryTweetsResponse> {
     return fetchListTweets(listId, maxTweets, cursor, this.auth);
+  }
+
+  /**
+   * Fetches the "For you" home timeline for the authenticated user.
+   * @param maxTweets The maximum number of tweets to return.
+   * @param cursor The pagination cursor returned by previous calls.
+   * @returns A page of results for the home timeline.
+   */
+  public fetchHomeTimeline(
+    maxTweets: number,
+    cursor?: string,
+  ): Promise<QueryTweetsResponse> {
+    return fetchHomeTimeline(maxTweets, this.auth, cursor);
+  }
+
+  /**
+   * Fetches the "Following" home timeline for the authenticated user.
+   * @param maxTweets The maximum number of tweets to return.
+   * @param cursor The pagination cursor returned by previous calls.
+   * @returns A page of results for the following timeline.
+   */
+  public fetchFollowingTimeline(
+    maxTweets: number,
+    cursor?: string,
+  ): Promise<QueryTweetsResponse> {
+    return fetchFollowingTimeline(maxTweets, this.auth, cursor);
   }
 
   /**
