@@ -55,6 +55,7 @@ export interface CreateTweetReplyOptions {
 
 export interface CreateTweetOptions {
   attachmentUrl?: string;
+  disallowedReplyOptions?: string[] | null;
   darkRequest?: boolean;
   media?: CreateTweetMediaOptions;
   quoteTweetId?: string;
@@ -459,11 +460,11 @@ export async function createTweet(
 
   const createTweetRequest = apiRequestFactory.createCreateTweetRequest();
   const headers = new Headers({
-    accept: 'application/json',
+    accept: '*/*',
     'accept-language': 'en-US,en;q=0.9',
     'content-type': 'application/json',
     origin: 'https://x.com',
-    referer: 'https://x.com/',
+    referer: 'https://x.com/home',
     'x-twitter-active-user': 'yes',
     'x-twitter-auth-type': 'OAuth2Session',
     'x-twitter-client-language': 'en',
@@ -475,6 +476,9 @@ export async function createTweet(
     media: toApiMediaEntities(options?.media),
     semantic_annotation_ids: options?.semanticAnnotationIds ?? [],
   };
+
+  variables['disallowed_reply_options'] =
+    options?.disallowedReplyOptions ?? null;
 
   if (options?.attachmentUrl) {
     variables['tweet_attachment_url'] = options.attachmentUrl;

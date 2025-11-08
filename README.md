@@ -89,7 +89,7 @@ console.log(quote.id, quote.text);
 
 The second argument accepts the same optional properties that the X/Twitter web
 client sends to GraphQL for tweet creation, such as `attachmentUrl`,
-`quoteTweetId`, reply targeting via `reply`, and media tagging through
+`disallowedReplyOptions`, `quoteTweetId`, reply targeting via `reply`, and media tagging through
 `media.mediaEntities`. Supplying these values is optional—`scraper.createTweet`
 only requires the tweet text when no extra behavior is needed.
 
