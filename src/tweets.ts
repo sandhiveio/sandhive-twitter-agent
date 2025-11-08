@@ -552,11 +552,16 @@ export async function createTweet(
     tweetId,
   );
 
-  if (!parsed) {
-    throw new Error('Failed to parse created tweet result.');
+  if (parsed) {
+    return parsed;
   }
 
-  return parsed;
+  const fetchedTweet = await getTweet(tweetId, auth);
+  if (fetchedTweet) {
+    return fetchedTweet;
+  }
+
+  throw new Error('Failed to parse created tweet result.');
 }
 
 export async function getTweet(
