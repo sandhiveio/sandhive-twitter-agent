@@ -61,3 +61,4 @@ export type {
   CreateTweetMediaOptions,
   CreateTweetReplyOptions,
 } from './tweets';
+export { fetchHomeTimeline, fetchFollowingTimeline } from './timeline-home';
