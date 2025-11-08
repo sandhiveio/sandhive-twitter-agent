@@ -33,6 +33,8 @@ import {
   getTweetsAndRepliesByUserId,
   getTweetsAndReplies,
   fetchLikedTweets,
+  createTweet,
+  CreateTweetOptions,
 } from './tweets';
 import fetch from 'cross-fetch';
 import { RateLimitStrategy } from './rate-limit';
@@ -410,6 +412,19 @@ export class Scraper {
     max = 200,
   ): Promise<Tweet | null | void> {
     return getLatestTweet(user, includeRetweets, max, this.auth);
+  }
+
+  /**
+   * Creates a tweet using the authenticated account.
+   * @param text The text content of the tweet.
+   * @param options Additional tweet options such as media, replies, or quotes.
+   * @returns The {@link Tweet} that was created.
+   */
+  public createTweet(
+    text: string,
+    options?: CreateTweetOptions,
+  ): Promise<Tweet> {
+    return createTweet(text, this.auth, options);
   }
 
   /**

@@ -45,6 +45,44 @@ iterators have been translated into
 instances, and can be consumed with the corresponding
 `for await (const x of y) { ... }` syntax.
 
+### Creating tweets
+
+Authenticated sessions can publish tweets by calling the new
+[`scraper.createTweet`](https://the-convocation.github.io/twitter-scraper/classes/Scraper.html#createTweet)
+method (or the named export of the same name). A full login flow is required,
+so be sure to call `scraper.login(username, password, email)` before creating
+content.
+
+```ts
+import { Scraper } from "@the-convocation/twitter-scraper";
+
+const scraper = new Scraper();
+await scraper.login(
+  process.env.TWITTER_USERNAME!,
+  process.env.TWITTER_PASSWORD!,
+  process.env.TWITTER_EMAIL!,
+);
+
+const created = await scraper.createTweet("Hello from twitter-scraper!", {
+  quoteTweetId: "1234567890123456789",
+  media: {
+    mediaEntities: [
+      {
+        mediaId: "1638699570943928320",
+      },
+    ],
+  },
+});
+
+console.log(created.id, created.text);
+```
+
+The second argument accepts the same optional properties that the X/Twitter web
+client sends to GraphQL for tweet creation, such as `attachmentUrl`,
+`quoteTweetId`, reply targeting via `reply`, and media tagging through
+`media.mediaEntities`. Supplying these values is optional—`scraper.createTweet`
+only requires the tweet text when no extra behavior is needed.
+
 ### Browser usage
 
 This package directly invokes the Twitter API, which does not have permissive

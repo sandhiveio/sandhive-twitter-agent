@@ -1,7 +1,11 @@
 import { addApiFeatures, requestApi } from './api';
 import { TwitterAuth } from './auth';
 import { getUserIdByScreenName } from './profile';
-import { LegacyTweetRaw, QueryTweetsResponse } from './timeline-v1';
+import {
+  LegacyTweetRaw,
+  QueryTweetsResponse,
+  TimelineResultRaw,
+} from './timeline-v1';
 import {
   parseTimelineTweetsV2,
   TimelineV2,
@@ -14,6 +18,7 @@ import { getTweetTimeline } from './timeline-async';
 import { apiRequestFactory } from './api-data';
 import { ListTimeline, parseListTimelineTweets } from './timeline-list';
 import { AuthenticationError } from './errors';
+import { Headers } from 'headers-polyfill';
 
 export interface Mention {
   id: string;
@@ -31,6 +36,30 @@ export interface Video {
   id: string;
   preview: string;
   url?: string;
+}
+
+export interface CreateTweetMediaEntity {
+  mediaId: string;
+  taggedUserIds?: string[];
+}
+
+export interface CreateTweetMediaOptions {
+  mediaEntities?: CreateTweetMediaEntity[];
+  possiblySensitive?: boolean;
+}
+
+export interface CreateTweetReplyOptions {
+  inReplyToTweetId: string;
+  excludeReplyUserIds?: string[];
+}
+
+export interface CreateTweetOptions {
+  attachmentUrl?: string;
+  darkRequest?: boolean;
+  media?: CreateTweetMediaOptions;
+  quoteTweetId?: string;
+  reply?: CreateTweetReplyOptions;
+  semanticAnnotationIds?: string[];
 }
 
 export interface PlaceRaw {
@@ -365,6 +394,165 @@ export async function getLatestTweet(
 
 export interface TweetResultByRestId {
   data?: TimelineEntryItemContentRaw;
+}
+
+interface CreateTweetMutationResponse {
+  data?: {
+    create_tweet?: {
+      tweet?: TimelineResultRaw;
+      tweet_results?: {
+        result?: TimelineResultRaw;
+      };
+      pending_tweet?: {
+        rest_id?: string;
+      };
+      errors?: { message?: string }[];
+    };
+  };
+  errors?: { message?: string }[];
+}
+
+function extractQueryId(url: string): string {
+  const parsed = new URL(url);
+  const segments = parsed.pathname.split('/').filter(Boolean);
+  const queryId = segments[3];
+  if (!queryId) {
+    throw new Error(`Unable to determine queryId from URL: ${url}`);
+  }
+
+  return queryId;
+}
+
+function toApiMediaEntities(
+  media?: CreateTweetMediaOptions,
+): {
+  media_entities: { media_id: string; tagged_user_ids: string[] }[];
+  possibly_sensitive: boolean;
+} {
+  if (!media) {
+    return {
+      media_entities: [],
+      possibly_sensitive: false,
+    };
+  }
+
+  return {
+    media_entities:
+      media.mediaEntities?.map((entity) => ({
+        media_id: entity.mediaId,
+        tagged_user_ids: entity.taggedUserIds ?? [],
+      })) ?? [],
+    possibly_sensitive: media.possiblySensitive ?? false,
+  };
+}
+
+export async function createTweet(
+  text: string,
+  auth: TwitterAuth,
+  options?: CreateTweetOptions,
+): Promise<Tweet> {
+  if (!(await auth.isLoggedIn())) {
+    throw new AuthenticationError(
+      'Scraper is not logged-in for creating tweets.',
+    );
+  }
+
+  const createTweetRequest = apiRequestFactory.createCreateTweetRequest();
+  const headers = new Headers({
+    accept: 'application/json',
+    'accept-language': 'en-US,en;q=0.9',
+    'content-type': 'application/json',
+    origin: 'https://x.com',
+    referer: 'https://x.com/',
+    'x-twitter-active-user': 'yes',
+    'x-twitter-auth-type': 'OAuth2Session',
+    'x-twitter-client-language': 'en',
+  });
+
+  const variables: Record<string, unknown> = {
+    tweet_text: text,
+    dark_request: options?.darkRequest ?? false,
+    media: toApiMediaEntities(options?.media),
+    semantic_annotation_ids: options?.semanticAnnotationIds ?? [],
+  };
+
+  if (options?.attachmentUrl) {
+    variables['tweet_attachment_url'] = options.attachmentUrl;
+  }
+
+  if (options?.quoteTweetId) {
+    variables['quote_tweet_id'] = options.quoteTweetId;
+  }
+
+  if (options?.reply) {
+    variables['reply'] = {
+      in_reply_to_tweet_id: options.reply.inReplyToTweetId,
+      exclude_reply_user_ids: options.reply.excludeReplyUserIds ?? [],
+    };
+  }
+
+  const body = {
+    variables,
+    features: createTweetRequest.features ?? {},
+    fieldToggles: createTweetRequest.fieldToggles ?? {},
+    queryId: extractQueryId(createTweetRequest.url),
+  };
+
+  const res = await requestApi<CreateTweetMutationResponse>(
+    createTweetRequest.url,
+    auth,
+    'POST',
+    undefined,
+    headers,
+    JSON.stringify(body),
+  );
+
+  if (!res.success) {
+    throw res.err;
+  }
+
+  const { errors, data } = res.value;
+  const createTweetResult = data?.create_tweet;
+  const resultErrors = errors?.length
+    ? errors
+    : createTweetResult?.errors;
+  if (resultErrors && resultErrors.length > 0) {
+    const [{ message }] = resultErrors;
+    throw new Error(message ?? 'Failed to create tweet.');
+  }
+
+  const tweetResult =
+    createTweetResult?.tweet_results?.result ??
+    createTweetResult?.tweet ??
+    undefined;
+
+  if (!tweetResult) {
+    throw new Error('Create tweet response did not contain a tweet result.');
+  }
+
+  const tweetId =
+    tweetResult.rest_id ??
+    tweetResult.legacy?.id_str ??
+    createTweetResult?.pending_tweet?.rest_id;
+
+  if (!tweetId) {
+    throw new Error('Create tweet response did not include a tweet identifier.');
+  }
+
+  const parsed = parseTimelineEntryItemContentRaw(
+    {
+      tweet_results: {
+        result: tweetResult,
+      },
+    },
+    tweetId,
+  );
+
+  if (!parsed) {
+    throw new Error('Failed to parse created tweet result.');
+  }
+
+  return parsed;
 }
 
 export async function getTweet(
