@@ -310,29 +310,15 @@ export class TwitterUserAuth extends TwitterGuestAuth {
     }
   }
 
-  async installCsrfToken(headers: Headers): Promise<void> {
-    const cookies = await this.getCookies();
-    const xCsrfToken = cookies.find((cookie) => cookie.key === 'ct0');
-    if (xCsrfToken) {
-      headers.set('x-csrf-token', xCsrfToken.value);
-    }
-  }
-
-  async installTo(headers: Headers): Promise<void> {
-    headers.set('authorization', `Bearer ${this.bearerToken}`);
+  async installTo(
+    headers: Headers,
+    url: string,
+    bearerTokenOverride?: string,
+  ): Promise<void> {
+    await super.installTo(headers, url, bearerTokenOverride);
     headers.set('x-twitter-auth-type', 'OAuth2Session');
     headers.set('x-twitter-active-user', 'yes');
     headers.set('x-twitter-client-language', 'en');
-    const cookie = await this.getCookieString();
-    headers.set('cookie', cookie);
-    if (this.guestToken) {
-      headers.set('x-guest-token', this.guestToken);
-    }
-    headers.set(
-      'user-agent',
-      'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/135.0.0.0 Safari/537.36',
-    );
-    await this.installCsrfToken(headers);
   }
 
   private async initLogin(): Promise<FlowTokenResult> {
@@ -576,7 +562,7 @@ export class TwitterUserAuth extends TwitterGuestAuth {
     _subtaskId: string,
     prev: TwitterUserAuthFlowResponse,
     _credentials: TwitterUserAuthCredentials,
-    _api: FlowSubtaskHandlerApi,
+    api: FlowSubtaskHandlerApi,
   ): Promise<FlowTokenResult> {
     return {
       status: 'success',
