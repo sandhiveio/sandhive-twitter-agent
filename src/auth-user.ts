@@ -318,13 +318,8 @@ export class TwitterUserAuth extends TwitterGuestAuth {
     }
   }
 
-  async installTo(
-    headers: Headers,
-    _url: string,
-    bearerTokenOverride?: string,
-  ): Promise<void> {
-    const tokenToUse = bearerTokenOverride ?? this.bearerToken;
-    headers.set('authorization', `Bearer ${tokenToUse}`);
+  async installTo(headers: Headers): Promise<void> {
+    headers.set('authorization', `Bearer ${this.bearerToken}`);
     headers.set('x-twitter-auth-type', 'OAuth2Session');
     headers.set('x-twitter-active-user', 'yes');
     headers.set('x-twitter-client-language', 'en');
@@ -586,7 +581,8 @@ export class TwitterUserAuth extends TwitterGuestAuth {
     return {
       status: 'success',
       response: {
-        ...prev,
+        flow_token: api.getFlowToken(),
+        status: 'success',
         subtasks: [],
       },
     };
