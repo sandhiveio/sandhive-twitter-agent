@@ -574,9 +574,9 @@ export class TwitterUserAuth extends TwitterGuestAuth {
 
   private async handleSuccessSubtask(
     _subtaskId: string,
-    _prev: TwitterUserAuthFlowResponse,
+    prev: TwitterUserAuthFlowResponse,
     _credentials: TwitterUserAuthCredentials,
-    api: FlowSubtaskHandlerApi,
+    _api: FlowSubtaskHandlerApi,
   ): Promise<FlowTokenResult> {
     return {
       status: 'success',
@@ -628,7 +628,7 @@ export class TwitterUserAuth extends TwitterGuestAuth {
       'x-twitter-active-user': 'yes',
       'x-twitter-client-language': 'en',
     });
-    await this.installTo(headers);
+    await this.installTo(headers, onboardingTaskUrl);
 
     let res: Response;
     do {

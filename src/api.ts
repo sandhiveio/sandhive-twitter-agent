@@ -32,6 +32,9 @@ export interface FetchTransformOptions {
 export const bearerToken =
   'AAAAAAAAAAAAAAAAAAAAAFQODgEAAAAAVHTp76lzh3rFzcHbmHVvQxYYpTw%3DckAlMINMjmCwxUcaXbAN4XqJVdgMJaHqNOFgPMK0zN1qLqLQCF';
 
+export const bearerToken2 =
+  'AAAAAAAAAAAAAAAAAAAAANRILgAAAAAAnNwgiH2RFKQFneXXtM4tAMUM2s8%3DHHM4nxl9zxlY7PZjj0V49RFSp3clPhfsw3JSZeCF6KC8w7JJ5R';
+
 export async function jitter(maxMs: number): Promise<void> {
   const jitter = Math.random() * maxMs;
   await new Promise((resolve) => setTimeout(resolve, jitter));
@@ -58,10 +61,11 @@ export async function requestApi<T>(
   platform?: PlatformExtensions,
   headers: Headers = new Headers(),
   body?: BodyInit | null,
+  bearerTokenOverride?: string,
 ): Promise<RequestApiResult<T>> {
   log(`Making ${method} request to ${url}`);
 
-  await auth.installTo(headers, url);
+  await auth.installTo(headers, url, bearerTokenOverride);
   const platformExtensions = platform ?? new Platform();
   await platformExtensions.randomizeCiphers();
 
