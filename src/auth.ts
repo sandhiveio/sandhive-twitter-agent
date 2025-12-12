@@ -1,4 +1,5 @@
 import { Cookie, CookieJar, MemoryCookieStore } from 'tough-cookie';
+import { randomBytes } from 'crypto';
 import { updateCookieJar } from './requests';
 import { Headers } from 'headers-polyfill';
 import fetch from 'cross-fetch';
@@ -196,11 +197,8 @@ export class TwitterGuestAuth implements TwitterAuth {
       'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/135.0.0.0 Safari/537.36',
     );
 
-    const cookies = await this.getCookies();
-    const xCsrfToken = cookies.find((cookie) => cookie.key === 'ct0');
-    if (xCsrfToken) {
-      headers.set('x-csrf-token', xCsrfToken.value);
-    }
+    const csrfToken = await this.ensureCsrfToken();
+    headers.set('x-csrf-token', csrfToken);
 
     headers.set('cookie', await this.getCookieString());
   }
@@ -241,6 +239,18 @@ export class TwitterGuestAuth implements TwitterAuth {
     }
   }
 
+  private async ensureCsrfToken(): Promise<string> {
+    const cookies = await this.getCookies();
+    const existingCsrfToken = cookies.find((cookie) => cookie.key === 'ct0');
+    if (existingCsrfToken) {
+      return existingCsrfToken.value;
+    }
+
+    const token = randomBytes(16).toString('hex');
+    await this.setCookie('ct0', token);
+    return token;
+  }
+
   private getCookieJarUrl(): string {
     return typeof document !== 'undefined'
       ? document.location.toString()
@@ -253,9 +263,16 @@ export class TwitterGuestAuth implements TwitterAuth {
   protected async updateGuestToken() {
     const guestActivateUrl = 'https://api.x.com/1.1/guest/activate.json';
 
+    const csrfToken = await this.ensureCsrfToken();
+
     const headers = new Headers({
       Authorization: `Bearer ${this.bearerToken}`,
       Cookie: await this.getCookieString(),
+      'x-csrf-token': csrfToken,
+      'x-twitter-active-user': 'yes',
+      'x-twitter-client-language': 'en',
+      'user-agent':
+        'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/135.0.0.0 Safari/537.36',
     });
 
     log(`Making POST request to ${guestActivateUrl}`);
