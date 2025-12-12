@@ -82,7 +82,11 @@ export interface TwitterAuth {
    * authentication token will be updated from the API automatically.
    * @param headers A Headers instance representing a request's headers.
    */
-  installTo(headers: Headers, url: string): Promise<void>;
+  installTo(
+    headers: Headers,
+    url: string,
+    bearerTokenOverride?: string,
+  ): Promise<void>;
 }
 
 /**
@@ -168,7 +172,11 @@ export class TwitterGuestAuth implements TwitterAuth {
     return new Date(this.guestCreatedAt);
   }
 
-  async installTo(headers: Headers): Promise<void> {
+  async installTo(
+    headers: Headers,
+    _url: string,
+    bearerTokenOverride?: string,
+  ): Promise<void> {
     if (this.shouldUpdate()) {
       await this.updateGuestToken();
     }
@@ -180,7 +188,8 @@ export class TwitterGuestAuth implements TwitterAuth {
       );
     }
 
-    headers.set('authorization', `Bearer ${this.bearerToken}`);
+    const tokenToUse = bearerTokenOverride ?? this.bearerToken;
+    headers.set('authorization', `Bearer ${tokenToUse}`);
     headers.set('x-guest-token', token);
     headers.set(
       'user-agent',

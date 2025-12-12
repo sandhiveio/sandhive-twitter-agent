@@ -1,4 +1,4 @@
-import { addApiFeatures, requestApi } from './api';
+import { addApiFeatures, bearerToken2, requestApi } from './api';
 import { TwitterAuth } from './auth';
 import { getUserIdByScreenName } from './profile';
 import {
@@ -154,6 +154,11 @@ export async function fetchTweets(
   const res = await requestApi<TimelineV2>(
     userTweetsRequest.toRequestUrl(),
     auth,
+    'GET',
+    undefined,
+    undefined,
+    undefined,
+    bearerToken2,
   );
 
   if (!res.success) {
@@ -186,6 +191,11 @@ export async function fetchTweetsAndReplies(
   const res = await requestApi<TimelineV2>(
     userTweetsRequest.toRequestUrl(),
     auth,
+    'GET',
+    undefined,
+    undefined,
+    undefined,
+    bearerToken2,
   );
 
   if (!res.success) {
@@ -216,6 +226,11 @@ export async function fetchListTweets(
   const res = await requestApi<ListTimeline>(
     listTweetsRequest.toRequestUrl(),
     auth,
+    'GET',
+    undefined,
+    undefined,
+    undefined,
+    bearerToken2,
   );
 
   if (!res.success) {
@@ -309,6 +324,11 @@ export async function fetchLikedTweets(
   const res = await requestApi<TimelineV2>(
     userTweetsRequest.toRequestUrl(),
     auth,
+    'GET',
+    undefined,
+    undefined,
+    undefined,
+    bearerToken2,
   );
 
   if (!res.success) {

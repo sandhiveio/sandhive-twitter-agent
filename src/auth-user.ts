@@ -318,8 +318,16 @@ export class TwitterUserAuth extends TwitterGuestAuth {
     }
   }
 
-  async installTo(headers: Headers): Promise<void> {
-    headers.set('authorization', `Bearer ${this.bearerToken}`);
+  async installTo(
+    headers: Headers,
+    _url: string,
+    bearerTokenOverride?: string,
+  ): Promise<void> {
+    const tokenToUse = bearerTokenOverride ?? this.bearerToken;
+    headers.set('authorization', `Bearer ${tokenToUse}`);
+    headers.set('x-twitter-auth-type', 'OAuth2Session');
+    headers.set('x-twitter-active-user', 'yes');
+    headers.set('x-twitter-client-language', 'en');
     const cookie = await this.getCookieString();
     headers.set('cookie', cookie);
     if (this.guestToken) {
@@ -571,14 +579,17 @@ export class TwitterUserAuth extends TwitterGuestAuth {
 
   private async handleSuccessSubtask(
     _subtaskId: string,
-    _prev: TwitterUserAuthFlowResponse,
+    prev: TwitterUserAuthFlowResponse,
     _credentials: TwitterUserAuthCredentials,
-    api: FlowSubtaskHandlerApi,
+    _api: FlowSubtaskHandlerApi,
   ): Promise<FlowTokenResult> {
-    return await this.executeFlowTask({
-      flow_token: api.getFlowToken(),
-      subtask_inputs: [],
-    });
+    return {
+      status: 'success',
+      response: {
+        ...prev,
+        subtasks: [],
+      },
+    };
   }
 
   private async executeFlowTask(
@@ -621,7 +632,7 @@ export class TwitterUserAuth extends TwitterGuestAuth {
       'x-twitter-active-user': 'yes',
       'x-twitter-client-language': 'en',
     });
-    await this.installTo(headers);
+    await this.installTo(headers, onboardingTaskUrl);
 
     let res: Response;
     do {
