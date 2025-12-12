@@ -105,28 +105,21 @@ describe('TwitterUserAuth', () => {
   const mockLoginFlow = (subtasks: string[]) => {
     mockFetch
       .mockResolvedValueOnce(mockResponses.guestToken)
-      .mockResolvedValueOnce(mockResponses.xcomHomepage) // For transaction ID generation
       .mockResolvedValueOnce(mockResponses.subtask('token1', subtasks[0]));
 
     for (let i = 1; i < subtasks.length; i++) {
-      mockFetch
-        .mockResolvedValueOnce(mockResponses.xcomHomepage) // For each transaction ID generation
-        .mockResolvedValueOnce(
-          mockResponses.subtask(`token${i + 1}`, subtasks[i]),
-        );
+      mockFetch.mockResolvedValueOnce(
+        mockResponses.subtask(`token${i + 1}`, subtasks[i]),
+      );
     }
-    mockFetch.mockResolvedValueOnce(mockResponses.success('final'));
   };
 
   const setupAuthenticatedState = async () => {
     mockFetch
       .mockResolvedValueOnce(mockResponses.guestToken)
-      .mockResolvedValueOnce(mockResponses.xcomHomepage)
       .mockResolvedValueOnce(
         mockResponses.subtask('token1', 'LoginSuccessSubtask'),
-      )
-      .mockResolvedValueOnce(mockResponses.xcomHomepage)
-      .mockResolvedValueOnce(mockResponses.success('final'));
+      );
 
     await auth.login('testuser', 'testpass');
     mockFetch.mockClear();
@@ -141,13 +134,12 @@ describe('TwitterUserAuth', () => {
       mockLoginFlow(loginFlows.standard);
       await auth.login('testuser', 'testpass');
 
-      // Guest token + (x.com + subtask) * 4 standard flows + final = 10 total
-      expect(mockFetch).toHaveBeenCalledTimes(10);
+      // Guest token + 4 standard subtask requests
+      expect(mockFetch).toHaveBeenCalledTimes(5);
       expect(mockFetch.mock.calls[0][0]).toBe(
         'https://api.x.com/1.1/guest/activate.json',
       );
-      expect(mockFetch.mock.calls[1][0]).toBe('https://x.com');
-      expect(mockFetch.mock.calls[2][0]).toBe(
+      expect(mockFetch.mock.calls[1][0]).toBe(
         'https://api.x.com/1.1/onboarding/task.json?flow_name=login',
       );
     });
@@ -155,7 +147,6 @@ describe('TwitterUserAuth', () => {
     it('should handle login failure', async () => {
       mockFetch
         .mockResolvedValueOnce(mockResponses.guestToken)
-        .mockResolvedValueOnce(mockResponses.xcomHomepage)
         .mockResolvedValueOnce(mockResponses.error(99, 'Invalid credentials'));
 
       await expect(auth.login('testuser', 'wrongpass')).rejects.toThrow(
@@ -166,7 +157,6 @@ describe('TwitterUserAuth', () => {
     it('should handle DenyLoginSubtask flow', async () => {
       mockFetch
         .mockResolvedValueOnce(mockResponses.guestToken)
-        .mockResolvedValueOnce(mockResponses.xcomHomepage)
         .mockResolvedValueOnce(
           mockResponses.subtask('token1', 'DenyLoginSubtask'),
         );
@@ -179,48 +169,38 @@ describe('TwitterUserAuth', () => {
     it('should handle 2FA challenge', async () => {
       mockLoginFlow(loginFlows.twoFactor);
       await auth.login('testuser', 'testpass', undefined, 'JBSWY3DPEHPK3PXP');
-      // Guest token + (x.com + subtask) * 5 2FA flows + final = 12 total
-      expect(mockFetch).toHaveBeenCalledTimes(12);
+      // Guest token + 5 subtask requests
+      expect(mockFetch).toHaveBeenCalledTimes(6);
     });
 
     it('should retry 2FA challenge after failure', async () => {
       mockFetch
         .mockResolvedValueOnce(mockResponses.guestToken)
-        .mockResolvedValueOnce(mockResponses.xcomHomepage)
         // First 2FA challenge
         .mockResolvedValueOnce(
           mockResponses.subtask('token1', 'LoginTwoFactorAuthChallenge'),
         )
-        .mockResolvedValueOnce(mockResponses.xcomHomepage)
         // First attempt fails
         .mockResolvedValueOnce(
           mockResponses.subtask('token2', 'LoginTwoFactorAuthChallenge'),
         )
-        .mockResolvedValueOnce(mockResponses.xcomHomepage)
         // Second attempt succeeds
         .mockResolvedValueOnce(
           mockResponses.subtask('token3', 'LoginSuccessSubtask'),
         )
-        .mockResolvedValueOnce(mockResponses.xcomHomepage)
-        // Final success
-        .mockResolvedValueOnce(mockResponses.success('final'));
 
       await auth.login('testuser', 'testpass', undefined, 'JBSWY3DPEHPK3PXP');
-      expect(mockFetch).toHaveBeenCalledTimes(9);
+      expect(mockFetch).toHaveBeenCalledTimes(4);
     });
 
     it('should handle all 2FA attempts failing', async () => {
       mockFetch
         .mockResolvedValueOnce(mockResponses.guestToken)
-        .mockResolvedValueOnce(mockResponses.xcomHomepage)
         .mockResolvedValueOnce(
           mockResponses.subtask('token1', 'LoginTwoFactorAuthChallenge'),
         )
-        .mockResolvedValueOnce(mockResponses.xcomHomepage)
         .mockResolvedValueOnce(mockResponses.error(236, 'Bad 2FA code'))
-        .mockResolvedValueOnce(mockResponses.xcomHomepage)
         .mockResolvedValueOnce(mockResponses.error(236, 'Bad 2FA code'))
-        .mockResolvedValueOnce(mockResponses.xcomHomepage)
         .mockResolvedValueOnce(mockResponses.error(236, 'Bad 2FA code'));
 
       await expect(
@@ -231,7 +211,6 @@ describe('TwitterUserAuth', () => {
     it('should handle missing TOTP secret during 2FA challenge', async () => {
       mockFetch
         .mockResolvedValueOnce(mockResponses.guestToken)
-        .mockResolvedValueOnce(mockResponses.xcomHomepage)
         .mockResolvedValueOnce(
           mockResponses.subtask('token1', 'LoginTwoFactorAuthChallenge'),
         );
@@ -244,7 +223,6 @@ describe('TwitterUserAuth', () => {
     it('should handle invalid TOTP secret during 2FA challenge', async () => {
       mockFetch
         .mockResolvedValueOnce(mockResponses.guestToken)
-        .mockResolvedValueOnce(mockResponses.xcomHomepage)
         .mockResolvedValueOnce(
           mockResponses.subtask('token1', 'LoginTwoFactorAuthChallenge'),
         );
@@ -257,7 +235,6 @@ describe('TwitterUserAuth', () => {
     it('should handle invalid subtask type', async () => {
       mockFetch
         .mockResolvedValueOnce(mockResponses.guestToken)
-        .mockResolvedValueOnce(mockResponses.xcomHomepage)
         .mockResolvedValueOnce(
           mockResponses.subtask('token1', 'UnknownSubtask'),
         );
@@ -270,7 +247,6 @@ describe('TwitterUserAuth', () => {
     it('should handle network errors', async () => {
       mockFetch
         .mockResolvedValueOnce(mockResponses.guestToken)
-        .mockResolvedValueOnce(mockResponses.xcomHomepage)
         .mockRejectedValueOnce(new Error('Network error'));
 
       await expect(auth.login('testuser', 'testpass')).rejects.toThrow(
@@ -281,7 +257,6 @@ describe('TwitterUserAuth', () => {
     it('should handle invalid response format', async () => {
       mockFetch
         .mockResolvedValueOnce(mockResponses.guestToken)
-        .mockResolvedValueOnce(mockResponses.xcomHomepage)
         .mockResolvedValueOnce({
           ok: true,
           json: () => Promise.resolve({}),
@@ -295,7 +270,6 @@ describe('TwitterUserAuth', () => {
     it('should handle rate limit errors', async () => {
       mockFetch
         .mockResolvedValueOnce(mockResponses.guestToken)
-        .mockResolvedValueOnce(mockResponses.xcomHomepage)
         .mockResolvedValueOnce(
           mockResponses.httpError(429, 'Too Many Requests', 'Rate limit hit'),
         );
@@ -308,7 +282,6 @@ describe('TwitterUserAuth', () => {
     it('should handle unauthorized errors', async () => {
       mockFetch
         .mockResolvedValueOnce(mockResponses.guestToken)
-        .mockResolvedValueOnce(mockResponses.xcomHomepage)
         .mockResolvedValueOnce(
           mockResponses.httpError(
             401,
