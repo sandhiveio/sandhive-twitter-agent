@@ -10,7 +10,12 @@ import * as OTPAuth from 'otpauth';
 import { FetchParameters } from './api-types';
 import debug from 'debug';
 
-const log = debug('twitter-scraper:auth-user');
+const debugLog = debug('twitter-scraper:auth-user');
+
+const log = (message: string): void => {
+  debugLog(message);
+  console.info(`[auth-user] ${message}`);
+};
 
 export interface TwitterUserAuthFlowInitRequest {
   flow_name: string;
