@@ -342,36 +342,46 @@ describe('TwitterUserAuth', () => {
 
   describe('isLoggedIn', () => {
     it('should return true when logged in', async () => {
-      mockFetch.mockResolvedValueOnce(mockResponses.success('verify'));
+      mockFetch
+        .mockResolvedValueOnce(mockResponses.guestToken)
+        .mockResolvedValueOnce(mockResponses.success('verify'));
       const result = await auth.isLoggedIn();
       expect(result).toBe(true);
     });
 
     it('should return false when not logged in', async () => {
-      mockFetch.mockResolvedValueOnce({
-        ok: true,
-        json: () => Promise.resolve({ errors: [{ code: 99 }] }),
-        text: () => Promise.resolve(JSON.stringify({ errors: [{ code: 99 }] })),
-        headers: new Headers(),
-      });
+      mockFetch
+        .mockResolvedValueOnce(mockResponses.guestToken)
+        .mockResolvedValueOnce({
+          ok: true,
+          json: () => Promise.resolve({ errors: [{ code: 99 }] }),
+          text: () =>
+            Promise.resolve(JSON.stringify({ errors: [{ code: 99 }] })),
+          headers: new Headers(),
+        });
 
       const result = await auth.isLoggedIn();
       expect(result).toBe(false);
     });
 
     it('should handle network error during status check', async () => {
-      mockFetch.mockRejectedValueOnce(new Error('Network error'));
+      mockFetch
+        .mockResolvedValueOnce(mockResponses.guestToken)
+        .mockRejectedValueOnce(new Error('Network error'));
       const result = await auth.isLoggedIn();
       expect(result).toBe(false);
     });
 
     it('should handle invalid response during status check', async () => {
-      mockFetch.mockResolvedValueOnce({
-        ok: true,
-        json: () => Promise.resolve({ errors: [{ code: -1 }] }),
-        text: () => Promise.resolve(JSON.stringify({ errors: [{ code: -1 }] })),
-        headers: new Headers(),
-      });
+      mockFetch
+        .mockResolvedValueOnce(mockResponses.guestToken)
+        .mockResolvedValueOnce({
+          ok: true,
+          json: () => Promise.resolve({ errors: [{ code: -1 }] }),
+          text: () =>
+            Promise.resolve(JSON.stringify({ errors: [{ code: -1 }] })),
+          headers: new Headers(),
+        });
 
       const result = await auth.isLoggedIn();
       expect(result).toBe(false);
