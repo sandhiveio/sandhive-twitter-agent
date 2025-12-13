@@ -33,7 +33,7 @@ export const bearerToken =
   'AAAAAAAAAAAAAAAAAAAAAFQODgEAAAAAVHTp76lzh3rFzcHbmHVvQxYYpTw%3DckAlMINMjmCwxUcaXbAN4XqJVdgMJaHqNOFgPMK0zN1qLqLQCF';
 
 export const bearerToken2 =
-  'AAAAAAAAAAAAAAAAAAAAANRILgAAAAAAnNwgiH2RFKQFneXXtM4tAMUM2s8%3DHHM4nxl9zxlY7PZjj0V49RFSp3clPhfsw3JSZeCF6KC8w7JJ5R';
+  'AAAAAAAAAAAAAAAAAAAAANRILgAAAAAAnNwIzUejRCOuH5E6I8xnZz4puTs%3D1Zv7ttfk8LF81IUq16cHjhLTvJu4FA33AGWWjCpTnA';
 
 export async function jitter(maxMs: number): Promise<void> {
   const jitter = Math.random() * maxMs;
