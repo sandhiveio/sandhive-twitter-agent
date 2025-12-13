@@ -256,7 +256,13 @@ export class TwitterUserAuth extends TwitterGuestAuth {
     email?: string,
     twoFactorSecret?: string,
   ): Promise<void> {
+    log('Refreshing guest token before starting login flow...');
     await this.updateGuestToken();
+    if (this.guestToken) {
+      log(
+        `Guest token refreshed (suffix: ${this.guestToken.slice(-6)}), proceeding with login flow...`,
+      );
+    }
 
     const credentials: TwitterUserAuthCredentials = {
       username,
@@ -276,6 +282,15 @@ export class TwitterUserAuth extends TwitterGuestAuth {
       `Initial login flow response received with status: ${next.status}`,
     );
 
+    if (next.status === 'success') {
+      const subtasks = next.response.subtasks?.map((task) => task.subtask_id);
+      log(
+        `Initial subtasks queued: ${subtasks?.length ? subtasks.join(', ') : 'none'}; flow token suffix: ${next.response.flow_token?.slice(
+          -6,
+        )}`,
+      );
+    }
+
     let lastSubtaskId: string | null = null;
     while (next.status === 'success' && next.response.subtasks?.length) {
       const flowToken = next.response.flow_token;
@@ -287,6 +302,15 @@ export class TwitterUserAuth extends TwitterGuestAuth {
       const subtaskId = next.response.subtasks[0].subtask_id;
       lastSubtaskId = subtaskId;
       const handler = this.subtaskHandlers.get(subtaskId);
+
+      const queuedSubtasks = next.response.subtasks
+        ?.map((task) => task.subtask_id)
+        .join(', ');
+      log(
+        `Preparing to handle subtask ${subtaskId}; queued subtasks: ${queuedSubtasks}; flow token suffix: ${flowToken.slice(
+          -6,
+        )}`,
+      );
 
       if (handler) {
         log(
@@ -315,6 +339,12 @@ export class TwitterUserAuth extends TwitterGuestAuth {
         }: ${next.err?.message ?? next.err}`,
       );
     }
+
+    log(
+      `Login flow completed successfully after subtask ${
+        lastSubtaskId ?? 'initialization'
+      }.`,
+    );
   }
 
   async logout(): Promise<void> {
@@ -694,6 +724,16 @@ export class TwitterUserAuth extends TwitterGuestAuth {
     }
 
     const flow: TwitterUserAuthFlowResponse = await flexParseJson(res);
+    const flowTokenSuffix =
+      typeof flow.flow_token === 'string'
+        ? flow.flow_token.slice(-6)
+        : 'missing';
+    const subtaskList =
+      flow.subtasks?.map((task) => task.subtask_id).join(', ') ?? 'none';
+
+    log(
+      `Flow task response for ${stageDescription}: http=${res.status}, flow status=${flow.status ?? 'unknown'}, flow token suffix=${flowTokenSuffix}, subtasks=${subtaskList}.`,
+    );
     if (flow?.flow_token == null) {
       return {
         status: 'error',
