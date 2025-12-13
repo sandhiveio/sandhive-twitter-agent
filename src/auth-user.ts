@@ -265,7 +265,18 @@ export class TwitterUserAuth extends TwitterGuestAuth {
       twoFactorSecret,
     };
 
+    log(
+      `Starting login flow for ${username} (email provided: ${
+        email != null
+      }, 2FA configured: ${twoFactorSecret ? 'yes' : 'no'})`,
+    );
+
     let next: FlowTokenResult = await this.initLogin();
+    log(
+      `Initial login flow response received with status: ${next.status}`,
+    );
+
+    let lastSubtaskId: string | null = null;
     while (next.status === 'success' && next.response.subtasks?.length) {
       const flowToken = next.response.flow_token;
       if (flowToken == null) {
@@ -274,19 +285,35 @@ export class TwitterUserAuth extends TwitterGuestAuth {
       }
 
       const subtaskId = next.response.subtasks[0].subtask_id;
+      lastSubtaskId = subtaskId;
       const handler = this.subtaskHandlers.get(subtaskId);
 
       if (handler) {
+        log(
+          `Handling subtask ${subtaskId} with flow token suffix: ${flowToken.slice(
+            -6,
+          )}`,
+        );
         next = await handler(subtaskId, next.response, credentials, {
           sendFlowRequest: this.executeFlowTask.bind(this),
           getFlowToken: () => flowToken,
         });
+        log(`Subtask ${subtaskId} completed with status: ${next.status}`);
       } else {
         throw new Error(`Unknown subtask ${subtaskId}`);
       }
     }
     if (next.status === 'error') {
-      throw next.err;
+      log(
+        `Login flow failed after subtask ${
+          lastSubtaskId ?? 'initialization'
+        } with error: ${next.err?.message ?? next.err}`,
+      );
+      throw new AuthenticationError(
+        `Login flow failed after ${
+          lastSubtaskId ?? 'initialization'
+        }: ${next.err?.message ?? next.err}`,
+      );
     }
   }
 
@@ -582,7 +609,14 @@ export class TwitterUserAuth extends TwitterGuestAuth {
       onboardingTaskUrl = `https://api.x.com/1.1/onboarding/task.json?flow_name=${data.flow_name}`;
     }
 
-    log(`Making POST request to ${onboardingTaskUrl}`);
+    const stageDescription = this.describeFlowStage(data);
+    const sanitizedPayload = this.sanitizeFlowRequest(data);
+
+    log(
+      `Making POST request to ${onboardingTaskUrl} for ${stageDescription} with payload: ${JSON.stringify(
+        sanitizedPayload,
+      )}`,
+    );
 
     const token = this.guestToken;
     if (token == null) {
@@ -653,6 +687,9 @@ export class TwitterUserAuth extends TwitterGuestAuth {
     } while (res.status === 429);
 
     if (!res.ok) {
+      log(
+        `Flow task for ${stageDescription} failed with status ${res.status}.`,
+      );
       return { status: 'error', err: await ApiError.fromResponse(res) };
     }
 
@@ -671,6 +708,14 @@ export class TwitterUserAuth extends TwitterGuestAuth {
           `Authentication error (${flow.errors[0].code}): ${flow.errors[0].message}`,
         ),
       };
+    }
+
+    if (flow.errors?.length) {
+      log(
+        `Authentication errors returned for ${stageDescription}: ${JSON.stringify(
+          flow.errors,
+        )}`,
+      );
     }
 
     if (typeof flow.flow_token !== 'string') {
@@ -694,5 +739,70 @@ export class TwitterUserAuth extends TwitterGuestAuth {
       status: 'success',
       response: flow,
     };
+  }
+
+  private describeFlowStage(data: TwitterUserAuthFlowRequest): string {
+    if ('flow_name' in data) {
+      return `flow initialization (${data.flow_name})`;
+    }
+
+    const subtaskIds = data.subtask_inputs
+      ?.map((input) => input.subtask_id)
+      .filter(Boolean);
+
+    if (subtaskIds?.length) {
+      return `subtask submission (${subtaskIds.join(', ')})`;
+    }
+
+    return 'unknown flow stage';
+  }
+
+  private sanitizeFlowRequest(data: TwitterUserAuthFlowRequest): unknown {
+    const cloned = JSON.parse(JSON.stringify(data));
+
+    if ('subtask_inputs' in cloned && Array.isArray(cloned.subtask_inputs)) {
+      cloned.subtask_inputs = cloned.subtask_inputs.map((input: any) => {
+        const sanitized = { ...input };
+
+        if (sanitized.enter_password?.password != null) {
+          sanitized.enter_password = {
+            ...sanitized.enter_password,
+            password: '[REDACTED]',
+          };
+        }
+
+        if (sanitized.enter_text?.text != null) {
+          sanitized.enter_text = {
+            ...sanitized.enter_text,
+            text: '[REDACTED]',
+          };
+        }
+
+        if (sanitized.settings_list?.setting_responses) {
+          sanitized.settings_list = {
+            ...sanitized.settings_list,
+            setting_responses: sanitized.settings_list.setting_responses.map(
+              (response: any) => {
+                const clonedResponse = { ...response };
+                if (clonedResponse.response_data?.text_data?.result != null) {
+                  clonedResponse.response_data = {
+                    ...clonedResponse.response_data,
+                    text_data: {
+                      ...clonedResponse.response_data.text_data,
+                      result: '[REDACTED]',
+                    },
+                  };
+                }
+                return clonedResponse;
+              },
+            ),
+          };
+        }
+
+        return sanitized;
+      });
+    }
+
+    return cloned;
   }
 }
