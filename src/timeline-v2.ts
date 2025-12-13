@@ -31,6 +31,20 @@ export interface TimelineEntryItemContentRaw {
   user_results?: {
     result?: TimelineUserResultRaw;
   };
+  content?: {
+    items?: {
+      item?: {
+        itemContent?: TimelineEntryItemContentRaw;
+      };
+    }[];
+    timelineModule?: {
+      items?: {
+        item?: {
+          itemContent?: TimelineEntryItemContentRaw;
+        };
+      }[];
+    };
+  };
 }
 
 export interface TimelineEntryRaw {
@@ -48,6 +62,7 @@ export interface TimelineEntryRaw {
       };
     }[];
     itemContent?: TimelineEntryItemContentRaw;
+    content?: TimelineEntryItemContentRaw['content'];
   };
 }
 
@@ -296,7 +311,7 @@ function parseResult(result?: TimelineResultRaw): ParseTweetResult {
   return tweetResult;
 }
 
-const expectedEntryTypes = ['tweet', 'profile-conversation'];
+const expectedEntryTypes = ['tweet', 'profile-conversation', 'homeConversation'];
 
 function getTimelineInstructionEntries(
   instruction: TimelineInstruction,
@@ -338,15 +353,21 @@ export function parseTimelineTweetsV2(
         continue;
       }
 
+      const moduleItems =
+        entryContent.items ??
+        entryContent.content?.items ??
+        entryContent.content?.timelineModule?.items ??
+        [];
+
       if (entryContent.itemContent) {
         // Typically TimelineTimelineTweet entries
         parseAndPush(tweets, entryContent.itemContent, idStr);
-      } else if (entryContent.items) {
-        // Typically TimelineTimelineModule entries
-        for (const item of entryContent.items) {
-          if (item.item?.itemContent) {
-            parseAndPush(tweets, item.item.itemContent, idStr);
-          }
+      }
+
+      // Typically TimelineTimelineModule entries or nested conversation threads
+      for (const item of moduleItems) {
+        if (item.item?.itemContent) {
+          parseAndPush(tweets, item.item.itemContent, idStr, true);
         }
       }
     }

@@ -529,6 +529,7 @@ export async function createTweet(
     undefined,
     headers,
     JSON.stringify(body),
+    bearerToken2,
   );
 
   if (!res.success) {
@@ -594,6 +595,11 @@ export async function getTweet(
   const res = await requestApi<ThreadedConversation>(
     tweetDetailRequest.toRequestUrl(),
     auth,
+    'GET',
+    undefined,
+    undefined,
+    undefined,
+    bearerToken2,
   );
 
   if (!res.success) {
@@ -619,6 +625,11 @@ export async function getTweetAnonymous(
   const res = await requestApi<TweetResultByRestId>(
     tweetResultByRestIdRequest.toRequestUrl(),
     auth,
+    'GET',
+    undefined,
+    undefined,
+    undefined,
+    bearerToken2,
   );
 
   if (!res.success) {
