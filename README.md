@@ -36,6 +36,25 @@ yarn add @the-convocation/twitter-scraper
 
 TypeScript types have been bundled with the distribution.
 
+## Repository notes
+
+This fork tracks fixes made after the upstream `0.19.1` release, including
+GraphQL bearer token updates, 2FA handling, CSRF installation for guest
+requests, and the refreshed query set from the `0.21.x` line. Keep the
+following in mind when developing locally:
+
+- Obtain fresh web bearer tokens (`bearerToken2`) before exercising GraphQL
+  endpoints such as HomeTimeline, TweetResultByRestId, and createTweet.
+- The login flow supports two-factor authentication. Provide a TOTP seed in
+  `TWITTER_2FA_SECRET` (base32) so the scraper can complete the challenge
+  automatically.
+- Guest requests still require CSRF cookies. Calls that use `auth.installTo()`
+  (for example `updateGuestToken` and timeline requests) will attach the
+  generated `ct0` header automatically.
+
+Set `DEBUG=twitter-scraper:*` to view request headers and cursor flow while
+developing new scrapers or parsers.
+
 ## Usage
 
 Most use cases are exactly the same as in
