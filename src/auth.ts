@@ -26,6 +26,7 @@ export interface TwitterAuthOptions {
 
 export interface TwitterAuth {
   fetch: typeof fetch;
+  options?: Partial<TwitterAuthOptions>;
 
   /**
    * How to behave when being rate-limited.

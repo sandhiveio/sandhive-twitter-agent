@@ -1,5 +1,5 @@
 import { FetchParameters } from './api-types';
-import { TwitterAuth, TwitterGuestAuth } from './auth';
+import { TwitterAuth } from './auth';
 import { ApiError } from './errors';
 import { Platform, PlatformExtensions } from './platform';
 import { updateCookieJar } from './requests';
@@ -71,10 +71,18 @@ export async function requestApi<T>(
   await auth.installTo(headers, url, bearerTokenOverride);
   await platform.randomizeCiphers?.();
 
-  if (
-    auth instanceof TwitterGuestAuth &&
-    auth.options?.experimental?.xClientTransactionId
-  ) {
+  // Add common web headers to more closely mirror the official client
+  if (!headers.has('x-twitter-active-user')) {
+    headers.set('x-twitter-active-user', 'yes');
+  }
+  if (!headers.has('x-twitter-client-language')) {
+    headers.set('x-twitter-client-language', 'en');
+  }
+  if (!headers.has('x-twitter-auth-type')) {
+    headers.set('x-twitter-auth-type', 'OAuth2Session');
+  }
+
+  if (auth.options?.experimental?.xClientTransactionId) {
     const transactionId = await generateTransactionId(
       url,
       auth.fetch.bind(auth),
