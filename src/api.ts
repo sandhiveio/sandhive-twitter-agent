@@ -62,14 +62,14 @@ export async function requestApi<T>(
   url: string,
   auth: TwitterAuth,
   method: 'GET' | 'POST' = 'GET',
-  platform?: PlatformExtensions,
+  platform: PlatformExtensions = new Platform(),
   headers: Headers = new Headers(),
   bearerTokenOverride?: string,
 ): Promise<RequestApiResult<T>> {
   log(`Making ${method} request to ${url}`);
 
   await auth.installTo(headers, url, bearerTokenOverride);
-  await platform.randomizeCiphers();
+  await platform.randomizeCiphers?.();
 
   if (
     auth instanceof TwitterGuestAuth &&
@@ -90,8 +90,7 @@ export async function requestApi<T>(
       {
         method,
         headers,
-        credentials: 'include',
-        body: body ?? undefined,
+        credentials: 'include'
       },
     ];
 

@@ -1,5 +1,5 @@
 {
-  "name": "@the-convocation/twitter-scraper",
+  "name": "@dontbanmeplease/sandhive-twitter-agent",
   "description": "A port of n0madic/twitter-scraper to Node.js.",
   "keywords": [
     "x",
@@ -7,7 +7,7 @@
     "scraper",
     "crawler"
   ],
-  "version": "0.21.0",
+  "version": "0.22.0",
   "main": "dist/default/cjs/index.js",
   "types": "./dist/types/index.d.ts",
   "exports": {
