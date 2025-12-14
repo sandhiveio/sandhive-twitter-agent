@@ -1,4 +1,4 @@
-import { requestApi } from './api';
+import { bearerToken2, requestApi } from './api';
 import { apiRequestFactory } from './api-data';
 import { TwitterAuth } from './auth';
 import { AuthenticationError } from './errors';
@@ -60,6 +60,10 @@ async function fetchHomeTimelineInternal(
   const res = await requestApi<HomeTimelineResponse>(
     request.toRequestUrl(),
     auth,
+    'GET',
+    undefined,
+    undefined,
+    bearerToken2,
   );
 
   if (!res.success) {
