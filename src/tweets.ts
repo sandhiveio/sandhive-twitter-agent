@@ -481,10 +481,24 @@ export async function createTweet(
   const createTweetRequest = apiRequestFactory.createCreateTweetRequest();
   const headers = new Headers({
     accept: '*/*',
-    'accept-language': 'en-US,en;q=0.9',
+    'accept-language': 'ru',
     'content-type': 'application/json',
     origin: 'https://x.com',
-    referer: 'https://x.com/home',
+    referer: 'https://x.com/compose/post',
+    priority: 'u=1, i',
+    'sec-ch-ua': '"Not;A=Brand";v="99", "Opera";v="123", "Chromium";v="139"',
+    'sec-ch-ua-arch': 'x86',
+    'sec-ch-ua-bitness': '64',
+    'sec-ch-ua-full-version': '123.0.5669.47',
+    'sec-ch-ua-full-version-list':
+      '"Not;A=Brand";v="99.0.0.0", "Opera";v="123.0.5669.47", "Chromium";v="139.0.7258.156"',
+    'sec-ch-ua-mobile': '?0',
+    'sec-ch-ua-model': '""',
+    'sec-ch-ua-platform': 'Windows',
+    'sec-ch-ua-platform-version': '15.0.0',
+    'sec-fetch-dest': 'empty',
+    'sec-fetch-mode': 'cors',
+    'sec-fetch-site': 'same-origin',
     'x-twitter-active-user': 'yes',
     'x-twitter-auth-type': 'OAuth2Session',
     'x-twitter-client-language': 'en',
@@ -515,12 +529,15 @@ export async function createTweet(
     };
   }
 
-  const body = {
+  const body: Record<string, unknown> = {
     variables,
     features: createTweetRequest.features ?? {},
-    fieldToggles: createTweetRequest.fieldToggles ?? {},
     queryId: extractQueryId(createTweetRequest.url),
   };
+
+  if (createTweetRequest.fieldToggles) {
+    body.fieldToggles = createTweetRequest.fieldToggles;
+  }
 
   const res = await requestApi<CreateTweetMutationResponse>(
     createTweetRequest.url,
@@ -528,6 +545,7 @@ export async function createTweet(
     'POST',
     undefined,
     headers,
+    undefined,
     JSON.stringify(body),
   );
 
