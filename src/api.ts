@@ -1,10 +1,11 @@
 import { FetchParameters } from './api-types';
-import { TwitterAuth } from './auth';
+import { TwitterAuth, TwitterGuestAuth } from './auth';
 import { ApiError } from './errors';
 import { Platform, PlatformExtensions } from './platform';
 import { updateCookieJar } from './requests';
 import { Headers } from 'headers-polyfill';
 import debug from 'debug';
+import { generateTransactionId } from './xctxid';
 
 const log = debug('twitter-scraper:api');
 
@@ -32,6 +33,9 @@ export interface FetchTransformOptions {
 export const bearerToken =
   'AAAAAAAAAAAAAAAAAAAAAFQODgEAAAAAVHTp76lzh3rFzcHbmHVvQxYYpTw%3DckAlMINMjmCwxUcaXbAN4XqJVdgMJaHqNOFgPMK0zN1qLqLQCF';
 
+export const bearerToken2 =
+  'AAAAAAAAAAAAAAAAAAAAANRILgAAAAAAnNwIzUejRCOuH5E6I8xnZz4puTs%3D1Zv7ttfk8LF81IUq16cHjhLTvJu4FA33AGWWjCpTnA';
+
 export async function jitter(maxMs: number): Promise<void> {
   const jitter = Math.random() * maxMs;
   await new Promise((resolve) => setTimeout(resolve, jitter));
@@ -50,6 +54,9 @@ export type RequestApiResult<T> =
  * @param url - The URL to send the request to.
  * @param auth - The instance of {@link TwitterAuth} that will be used to authorize this request.
  * @param method - The HTTP method used when sending this request.
+ * @param platform - The platform extensions to use.
+ * @param headers - The headers to include in the request.
+ * @param bearerTokenOverride - Optional bearer token to use instead of the default one.
  */
 export async function requestApi<T>(
   url: string,
@@ -57,13 +64,24 @@ export async function requestApi<T>(
   method: 'GET' | 'POST' = 'GET',
   platform?: PlatformExtensions,
   headers: Headers = new Headers(),
-  body?: BodyInit | null,
+  bearerTokenOverride?: string,
 ): Promise<RequestApiResult<T>> {
   log(`Making ${method} request to ${url}`);
 
-  await auth.installTo(headers, url);
-  const platformExtensions = platform ?? new Platform();
-  await platformExtensions.randomizeCiphers();
+  await auth.installTo(headers, url, bearerTokenOverride);
+  await platform.randomizeCiphers();
+
+  if (
+    auth instanceof TwitterGuestAuth &&
+    auth.options?.experimental?.xClientTransactionId
+  ) {
+    const transactionId = await generateTransactionId(
+      url,
+      auth.fetch.bind(auth),
+      method,
+    );
+    headers.set('x-client-transaction-id', transactionId);
+  }
 
   let res: Response;
   do {
