@@ -93,46 +93,63 @@ export async function requestApi<T>(
     headers.set('x-client-transaction-id', transactionId);
   }
 
-  let res: Response;
-  do {
-    const fetchParameters: FetchParameters = [
-      url,
-      {
-        method,
-        headers,
-        credentials: 'include',
-        body,
-      },
-    ];
+  let res: Response | undefined;
+  for (let attempt = 1; attempt <= 5; attempt++) {
+    do {
+      const fetchParameters: FetchParameters = [
+        url,
+        {
+          method,
+          headers,
+          credentials: 'include',
+          body,
+        },
+      ];
 
-    try {
-      res = await auth.fetch(...fetchParameters);
-    } catch (err) {
-      if (!(err instanceof Error)) {
-        throw err;
+      try {
+        res = await auth.fetch(...fetchParameters);
+      } catch (err) {
+        if (!(err instanceof Error)) {
+          throw err;
+        }
+
+        return {
+          success: false,
+          err: new Error('Failed to perform request.'),
+        };
       }
 
+      await updateCookieJar(auth.cookieJar(), res.headers);
+
+      if (res.status === 429) {
+        log('Rate limit hit, waiting for retry...');
+        await auth.onRateLimit({
+          fetchParameters: fetchParameters,
+          response: res,
+        });
+      }
+    } while (res.status === 429);
+
+    if (res.ok) {
+      break;
+    }
+
+    if (res.status !== 401 && res.status !== 404) {
       return {
         success: false,
-        err: new Error('Failed to perform request.'),
+        err: await ApiError.fromResponse(res),
       };
     }
 
-    await updateCookieJar(auth.cookieJar(), res.headers);
-
-    if (res.status === 429) {
-      log('Rate limit hit, waiting for retry...');
-      await auth.onRateLimit({
-        fetchParameters: fetchParameters,
-        response: res,
-      });
+    if (attempt < 5) {
+      log(`Received ${res.status} response, retrying (${attempt}/5)...`);
     }
-  } while (res.status === 429);
+  }
 
-  if (!res.ok) {
+  if (!res?.ok) {
     return {
       success: false,
-      err: await ApiError.fromResponse(res),
+      err: await ApiError.fromResponse(res!),
     };
   }
 
