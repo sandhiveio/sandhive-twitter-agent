@@ -361,12 +361,19 @@ export function parseTimelineEntryItemContentRaw(
   isConversation = false,
 ) {
   let result = content.tweet_results?.result ?? content.tweetResult?.result;
-  if (
+  const isTweetResult =
     result?.__typename === 'Tweet' ||
+    (!result?.__typename && (result?.rest_id || result?.legacy));
+
+  if (
+    isTweetResult ||
     (result?.__typename === 'TweetWithVisibilityResults' && result?.tweet)
   ) {
-    if (result?.__typename === 'TweetWithVisibilityResults')
-      result = result.tweet;
+    if (result?.__typename === 'TweetWithVisibilityResults') result = result.tweet;
+
+    if (isTweetResult && !result?.__typename) {
+      result = { ...result, __typename: 'Tweet' };
+    }
 
     if (result?.legacy) {
       result.legacy.id_str =
