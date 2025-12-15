@@ -571,7 +571,7 @@ export async function createTweet(
     'POST',
     undefined,
     headers,
-    undefined,
+    bearerToken2,
     JSON.stringify(body),
   );
 
