@@ -19,6 +19,9 @@ import { apiRequestFactory } from './api-data';
 import { ListTimeline, parseListTimelineTweets } from './timeline-list';
 import { AuthenticationError } from './errors';
 import { Headers } from 'headers-polyfill';
+import debug from 'debug';
+
+const log = debug('twitter-scraper:tweets');
 
 export interface Mention {
   id: string;
@@ -433,6 +436,29 @@ interface CreateTweetMutationResponse {
   errors?: { message?: string }[];
 }
 
+function normalizeTweetResult(
+  raw?: unknown,
+): TimelineResultRaw | undefined {
+  if (!raw || typeof raw !== 'object') {
+    return undefined;
+  }
+
+  const candidate = raw as {
+    tweet?: TimelineResultRaw;
+    tweet_results?: { result?: TimelineResultRaw };
+  } & TimelineResultRaw;
+
+  if (candidate.tweet_results?.result) {
+    return normalizeTweetResult(candidate.tweet_results.result);
+  }
+
+  if (candidate.tweet) {
+    return candidate.tweet;
+  }
+
+  return candidate;
+}
+
 function extractQueryId(url: string): string {
   const parsed = new URL(url);
   const segments = parsed.pathname.split('/').filter(Boolean);
@@ -553,8 +579,11 @@ export async function createTweet(
     throw res.err;
   }
 
+  log('CreateTweet raw response: %O', res.value);
+
   const { errors, data } = res.value;
   const createTweetResult = data?.create_tweet;
+  log('CreateTweet mutation result payload: %O', createTweetResult);
   const resultErrors = errors?.length
     ? errors
     : createTweetResult?.errors;
@@ -563,10 +592,9 @@ export async function createTweet(
     throw new Error(message ?? 'Failed to create tweet.');
   }
 
-  const tweetResult =
-    createTweetResult?.tweet_results?.result ??
-    createTweetResult?.tweet ??
-    undefined;
+  const tweetResult = normalizeTweetResult(
+    createTweetResult?.tweet_results?.result ?? createTweetResult?.tweet,
+  );
 
   if (!tweetResult) {
     throw new Error('Create tweet response did not contain a tweet result.');
@@ -591,6 +619,10 @@ export async function createTweet(
   );
 
   if (!parsed) {
+    log('Failed to parse created tweet result: %O', {
+      createTweetResult,
+      tweetResult,
+    });
     throw new Error('Failed to parse created tweet result.');
   }
 
