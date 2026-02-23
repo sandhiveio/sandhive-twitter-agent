@@ -1,361 +1,188 @@
-# twitter-scraper
+# SandHive Twitter Agent
 
-[![Documentation badge](https://img.shields.io/badge/docs-here-informational)](https://the-convocation.github.io/twitter-scraper/)
+SandHive Twitter Agent is a TypeScript library for building X/Twitter engagement agents.
 
-A port of the now-archived [n0madic/twitter-scraper](https://github.com/n0madic/twitter-scraper) to Node.js.
+This repository is a **SandHive-focused fork** of the original twitter-scraper lineage, adapted for social-growth workflows used by [SandHive](https://www.sandhive.io).
 
-> Twitter's API is annoying to work with, and has lots of limitations — luckily
-> their frontend (JavaScript) has it's own API, which I reverse-engineered. No
-> API rate limits. No tokens needed. No restrictions. Extremely fast.
->
-> You can use this library to get the text of any user's Tweets trivially.
+SandHive is an AI engine for social growth: it deploys configurable agents that read conversations (e.g., on X/Twitter) and publish relevant, on-brand replies at scale to drive attention, follows, and inbound opportunities.
 
-Many things have changed since X (the company formerly known as Twitter) was acquired in 2022:
+Instead of generic automation, SandHive focuses on context-aware engagement—agents can be tuned to specific niches, tones, and goals, and can route interactions back to the right account for human follow-up when needed.
 
-- Several operations require logging in with a real user account via
-  `scraper.login()`. **While we are not aware of confirmed cases caused
-  by this library, any account you log into with this library is subject
-  to being banned at any time. You have been warned.**
-- Twitter's frontend API does in fact have rate limits
-  ([#11](https://github.com/the-convocation/twitter-scraper/issues/11)).
-  The rate limits are dynamic and sometimes change, so we don't know
-  exactly what they are at all times. Refer to [rate limiting](#rate-limiting)
-  for more information.
-- Twitter's authentication requirements and frontend API endpoints
-  change frequently, breaking this library. Fixes for these issues
-  typically take at least a few days to go out.
+The outcome is a repeatable growth loop: consistent presence across many threads, measurable engagement lift, and a pipeline of qualified conversations—powered by agents, governed by rules, and optimized like a performance system.
+
+---
+
+## What this library gives you
+
+- Login and session handling for X/Twitter web flows.
+- Read operations for profiles, timelines, search, trends, relationships, and DMs.
+- Write operations for posting tweets, replies, and quote tweets.
+- Async-iterator based APIs for stream-like consumption.
+- Configurable request transformation, custom `fetch`, and rate-limit strategy hooks.
 
 ## Installation
 
-This package requires Node.js v16.0.0 or greater.
-
-NPM:
-
-```sh
-npm install @the-convocation/twitter-scraper
+```bash
+npm install @dontbanmeplease/sandhive-twitter-agent
 ```
 
-Yarn:
+or
 
-```sh
-yarn add @the-convocation/twitter-scraper
+```bash
+yarn add @dontbanmeplease/sandhive-twitter-agent
 ```
 
-TypeScript types have been bundled with the distribution.
+Node.js `>=16` is required.
 
-## Usage
-
-Most use cases are exactly the same as in
-[n0madic/twitter-scraper](https://github.com/n0madic/twitter-scraper). Channel
-iterators have been translated into
-[AsyncGenerator](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/AsyncGenerator)
-instances, and can be consumed with the corresponding
-`for await (const x of y) { ... }` syntax.
-
-### Creating tweets
-
-Authenticated sessions can publish tweets by calling the new
-[`scraper.createTweet`](https://the-convocation.github.io/twitter-scraper/classes/Scraper.html#createTweet)
-method (or the named export of the same name). A full login flow is required,
-so be sure to call `scraper.login(username, password, email)` before creating
-content.
+## Quick start
 
 ```ts
-import { Scraper } from "@the-convocation/twitter-scraper";
+import { Scraper } from '@dontbanmeplease/sandhive-twitter-agent';
 
 const scraper = new Scraper();
+
 await scraper.login(
   process.env.TWITTER_USERNAME!,
   process.env.TWITTER_PASSWORD!,
   process.env.TWITTER_EMAIL!,
 );
 
-// Standalone tweet
-const created = await scraper.createTweet("Hello from twitter-scraper!");
-console.log(created.id, created.text);
+const latest = await scraper.getLatestTweet('twitterdev');
+console.log(latest?.id, latest?.text);
+```
 
-// Reply
-const reply = await scraper.createTweet("Replying with createTweet", {
-  reply: { inReplyToTweetId: "1234567890123456789" },
-});
-console.log(reply.id, reply.text);
+## Common agent workflows
 
-// Quote tweet with media
-const quote = await scraper.createTweet("Quoting with media", {
-  quoteTweetId: "9876543210987654321",
-  media: {
-    mediaEntities: [
-      {
-        mediaId: "1638699570943928320",
-      },
-    ],
-  },
+### 1) Discover relevant conversations with search
+
+```ts
+import { Scraper, SearchMode } from '@dontbanmeplease/sandhive-twitter-agent';
+
+const scraper = new Scraper();
+await scraper.login(USERNAME, PASSWORD, EMAIL);
+
+for await (const tweet of scraper.searchTweets('ai founder growth', 20, SearchMode.Top)) {
+  console.log(`[${tweet.userId}] ${tweet.text}`);
+}
+```
+
+### 2) Publish a contextual reply
+
+```ts
+import { Scraper } from '@dontbanmeplease/sandhive-twitter-agent';
+
+const scraper = new Scraper();
+await scraper.login(USERNAME, PASSWORD, EMAIL);
+
+const reply = await scraper.createTweet('Great point — here is a practical approach...', {
+  reply: { inReplyToTweetId: '1234567890123456789' },
 });
+
+console.log(reply.id);
+```
+
+### 3) Quote-tweet with commentary
+
+```ts
+const quote = await scraper.createTweet('Worth reading if you are building in public.', {
+  quoteTweetId: '9876543210987654321',
+});
+
 console.log(quote.id, quote.text);
 ```
 
-The second argument accepts the same optional properties that the X/Twitter web
-client sends to GraphQL for tweet creation, such as `attachmentUrl`,
-`disallowedReplyOptions`, `quoteTweetId`, reply targeting via `reply`, and media tagging through
-`media.mediaEntities`. Supplying these values is optional—`scraper.createTweet`
-only requires the tweet text when no extra behavior is needed.
-
-#### Migrating from `sendTweet` / `sendQuoteTweet`
-
-Older code that called `scraper.sendTweet` or `scraper.sendQuoteTweet` can be
-rewritten to use `createTweet` directly by switching the branching logic to pass
-different option objects:
+### 4) Track account-level context
 
 ```ts
-const created = await scraper.createTweet(reply, replyOrQuote
-  ? { reply: { inReplyToTweetId: tweetId } }
-  : { quoteTweetId: tweetId },
-);
+const profile = await scraper.getProfile('twitterdev');
+const following = await scraper.getFollowing('twitterdev', 50);
 
-console.log(created.id, created.text);
+console.log(profile?.name, following.length);
 ```
 
-For a more complete example that mirrors the original imperative control flow,
-see [`examples/create-tweet.ts`](examples/create-tweet.ts).
+## Runtime customization
 
-### Browser usage
-
-This package directly invokes the Twitter API, which does not have permissive
-CORS headers. With the default settings, requests will fail unless you disable
-CORS checks, which is not advised. Instead, applications must provide a CORS
-proxy and configure it in the `Scraper` options.
-
-Proxies (and other request mutations) can be configured with the request
-interceptor transform:
+### Request transform (e.g., CORS proxy)
 
 ```ts
 const scraper = new Scraper({
   transform: {
-    request(input: RequestInfo | URL, init?: RequestInit) {
-      // The arguments here are the same as the parameters to fetch(), and
-      // are kept as-is for flexibility of both the library and applications.
-      if (input instanceof URL) {
-        const proxy =
-          'https://corsproxy.io/?' + encodeURIComponent(input.toString());
-        return [proxy, init];
-      } else if (typeof input === 'string') {
-        const proxy = 'https://corsproxy.io/?' + encodeURIComponent(input);
-        return [proxy, init];
-      } else {
-        // Omitting handling for example
-        throw new Error('Unexpected request input type');
-      }
+    request(input, init) {
+      const raw = input instanceof URL ? input.toString() : String(input);
+      return ['https://corsproxy.io/?' + encodeURIComponent(raw), init];
     },
   },
 });
 ```
 
-[corsproxy.io](https://corsproxy.io) is a public CORS proxy that works correctly
-with this package.
-
-The public CORS proxy [corsproxy.org](https://corsproxy.org) _does not work_ at
-the time of writing (at least not using their recommended integration on the
-front page).
-
-#### Next.js 13.x example:
-
-```tsx
-'use client';
-
-import { Scraper, Tweet } from '@the-convocation/twitter-scraper';
-import { useEffect, useMemo, useState } from 'react';
-
-export default function Home() {
-  const scraper = useMemo(
-    () =>
-      new Scraper({
-        transform: {
-          request(input: RequestInfo | URL, init?: RequestInit) {
-            if (input instanceof URL) {
-              const proxy =
-                'https://corsproxy.io/?' + encodeURIComponent(input.toString());
-              return [proxy, init];
-            } else if (typeof input === 'string') {
-              const proxy =
-                'https://corsproxy.io/?' + encodeURIComponent(input);
-              return [proxy, init];
-            } else {
-              throw new Error('Unexpected request input type');
-            }
-          },
-        },
-      }),
-    [],
-  );
-  const [tweet, setTweet] = useState<Tweet | null>(null);
-
-  useEffect(() => {
-    async function getTweet() {
-      const latestTweet = await scraper.getLatestTweet('twitter');
-      if (latestTweet) {
-        setTweet(latestTweet);
-      }
-    }
-
-    getTweet();
-  }, [scraper]);
-
-  return (
-    <main className="flex min-h-screen flex-col items-center justify-between p-24">
-      {tweet?.text}
-    </main>
-  );
-}
-```
-
-### Edge runtimes
-
-This package currently uses
-[`cross-fetch`](https://www.npmjs.com/package/cross-fetch) as a portable
-`fetch`. Edge runtimes such as CloudFlare Workers sometimes have `fetch`
-functions that behave differently from the web standard, so you may need to
-override the `fetch` function the scraper uses. If so, a custom `fetch` can be
-provided in the options:
+### Custom rate-limit strategy
 
 ```ts
-const scraper = new Scraper({
-  fetch: fetch,
-});
-```
-
-Note that this does not change the arguments passed to the function, or the
-expected return type. If the custom `fetch` function produces runtime errors
-related to incorrect types, be sure to wrap it in a shim (not currently
-supported directly by interceptors):
-
-```ts
-const scraper = new Scraper({
-  fetch: (input, init) => {
-    // Transform input and init into your function's expected types...
-    return fetch(input, init).then((res) => {
-      // Transform res into a web-compliant response...
-      return res;
-    });
-  },
-});
-```
-
-### Bypassing Cloudflare bot detection
-
-In some cases, Twitter's authentication endpoints may be protected by Cloudflare's advanced bot detection, resulting in `403 Forbidden` errors during login. This typically happens because standard Node.js TLS fingerprints are detected as non-browser clients.
-
-To bypass this protection, you can use the optional CycleTLS `fetch` integration to mimic Chrome browser TLS fingerprints:
-
-**Installation:**
-
-```sh
-npm install cycletls
-# or
-yarn add cycletls
-```
-
-**Usage:**
-
-```ts
-import { Scraper } from '@the-convocation/twitter-scraper';
 import {
-  cycleTLSFetch,
-  cycleTLSExit,
-} from '@the-convocation/twitter-scraper/cycletls';
+  Scraper,
+  RateLimitEvent,
+  RateLimitStrategy,
+} from '@dontbanmeplease/sandhive-twitter-agent';
 
-const scraper = new Scraper({
-  fetch: cycleTLSFetch,
-});
-
-// Use the scraper normally
-await scraper.login(username, password, email);
-
-// Important: cleanup CycleTLS resources when done
-cycleTLSExit();
-```
-
-**Note:** The `/cycletls` entrypoint is Node.js only and will not work in browser environments. It's provided as a separate optional entrypoint to avoid bundling binaries in environments where they cannot run.
-
-See the [cycletls example](./examples/cycletls/) for a complete working example.
-
-### Rate limiting
-
-The Twitter API heavily rate-limits clients, requiring that the scraper has its own
-rate-limit handling to behave predictably when rate-limiting occurs. By default, the
-scraper uses a rate-limiting strategy that waits for the current rate-limiting period
-to expire before resuming requests.
-
-**This has been known to take a very long time, in some cases (up to 13 minutes).**
-
-You may want to change how rate-limiting events are handled, potentially by pooling
-scrapers logged-in to different accounts (refer to [#116](https://github.com/the-convocation/twitter-scraper/pull/116) for how to do this yourself). The rate-limit handling strategy can be configured by passing a custom
-implementation to the `rateLimitStrategy` option in the scraper constructor:
-
-```ts
-import { Scraper, RateLimitStrategy } from '@the-convocation/twitter-scraper';
-
-class CustomRateLimitStrategy implements RateLimitStrategy {
+class LogAndWaitStrategy implements RateLimitStrategy {
   async onRateLimit(event: RateLimitEvent): Promise<void> {
-    // your own logic...
+    console.log('Rate limited:', event.message);
+    await new Promise((resolve) => setTimeout(resolve, 15_000));
   }
 }
 
 const scraper = new Scraper({
-  rateLimitStrategy: new CustomRateLimitStrategy(),
+  rateLimitStrategy: new LogAndWaitStrategy(),
 });
 ```
 
-More information on this interface can be found on the [`RateLimitStrategy`](https://the-convocation.github.io/twitter-scraper/interfaces/RateLimitStrategy.html)
-page in the documentation. The library provides two pre-written implementations to choose from:
+### Optional CycleTLS integration (Node.js)
 
-- `WaitingRateLimitStrategy`: The default, which waits for the limit to expire.
-- `ErrorRateLimitStrategy`: A strategy that throws if any rate-limit event occurs.
+```ts
+import { Scraper } from '@dontbanmeplease/sandhive-twitter-agent';
+import {
+  cycleTLSFetch,
+  cycleTLSExit,
+} from '@dontbanmeplease/sandhive-twitter-agent/cycletls';
+
+const scraper = new Scraper({ fetch: cycleTLSFetch });
+await scraper.login(USERNAME, PASSWORD, EMAIL);
+
+cycleTLSExit();
+```
+
+## Examples directory
+
+See ready-to-run examples:
+
+- `examples/create-tweet.ts`
+- `examples/cors-proxy/`
+- `examples/node-integration/`
+- `examples/react-integration/`
+- `examples/cycletls/`
+
+## Important notes
+
+- X/Twitter can change internal APIs without notice; breakages can happen.
+- Some operations require authenticated sessions.
+- Accounts that automate actions may be subject to platform enforcement.
 
 ## Contributing
 
-### Setup
-
-This project currently requires Node 18.x for development and uses Yarn for
-package management.
-[Corepack](https://nodejs.org/dist/latest-v18.x/docs/api/corepack.html) is
-configured for this project, so you don't need to install a particular package
-manager version manually.
-
-> The project supports Node 16.x at runtime, but requires Node 18.x to run its
-> build tools.
-
-Just run `corepack enable` to turn on the shims, then run `yarn` to install the
-dependencies.
-
-#### Basic scripts
-
-- `yarn build`: Builds the project into the `dist` folder
-- `yarn test`: Runs the package tests (see [Testing](#testing) first)
-
-Run `yarn help` for general `yarn` usage information.
-
-### Testing
-
-This package includes unit tests for all major functionality. Given the speed at
-which Twitter's private API changes, failing tests are to be expected.
-
-```sh
+```bash
+yarn
+yarn build
 yarn test
 ```
 
-Before running tests, you should configure environment variables for
-authentication.
+If you use local credentials for tests, set:
 
-```
-TWITTER_USERNAME=    # Account username
-TWITTER_PASSWORD=    # Account password
-TWITTER_EMAIL=       # Account email
-TWITTER_COOKIES=     # JSON-serialized array of cookies of an authenticated session
-PROXY_URL=           # HTTP(s) proxy for requests (optional)
-```
+- `TWITTER_USERNAME`
+- `TWITTER_PASSWORD`
+- `TWITTER_EMAIL`
+- `TWITTER_COOKIES` (optional serialized cookie jar)
+- `PROXY_URL` (optional)
 
-### Commit message format
+## License
 
-We use [Conventional Commits](https://www.conventionalcommits.org), and enforce
-this with precommit checks. Please refer to the Git history for real examples of
-the commit message format.
+MIT
