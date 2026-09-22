@@ -255,6 +255,7 @@ export class TwitterUserAuth extends TwitterGuestAuth {
     twoFactorSecret?: string,
   ): Promise<void> {
     await this.preflight();
+    await this.adoptGuestTokenCookie();
     if (!this.guestToken) {
       await this.updateGuestToken();
     }
@@ -318,11 +319,17 @@ export class TwitterUserAuth extends TwitterGuestAuth {
       });
       await updateCookieJar(this.jar, res.headers);
 
+      const fromJar = await this.adoptGuestTokenCookie();
+      if (fromJar) {
+        return;
+      }
+
       const html = await res.text();
       const gtMatch = html.match(/document\.cookie="gt=(\d+)/);
       if (gtMatch) {
         this.guestToken = gtMatch[1];
         this.guestCreatedAt = new Date();
+        await this.removeCookie('gt');
         await this.setCookie('gt', gtMatch[1]);
       }
     } catch (err) {

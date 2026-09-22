@@ -243,13 +243,38 @@ export class TwitterGuestAuth implements TwitterAuth {
   /**
    * Bearer, guest token, and cookies only.
    * The login task must not also get csrf, xpff, or x-twitter-auth-type.
+   * x-guest-token is taken from the gt cookie so the header and cookie match.
    */
   async installAuthCredentials(headers: Headers): Promise<void> {
+    await this.adoptGuestTokenCookie();
     headers.set('authorization', `Bearer ${this.bearerToken}`);
     if (this.guestToken) {
       headers.set('x-guest-token', this.guestToken);
     }
     headers.set('cookie', await this.getCookieString());
+  }
+
+  /**
+   * Use the gt cookie as the guest token. If the jar holds more than one gt,
+   * keep a single value so onboarding does not see a mismatched pair.
+   */
+  protected async adoptGuestTokenCookie(): Promise<string | null> {
+    const cookies = await this.getCookies();
+    const guestCookies = cookies.filter((cookie) => cookie.key === 'gt');
+    if (!guestCookies.length) {
+      return this.guestToken ?? null;
+    }
+
+    const value = guestCookies[guestCookies.length - 1].value;
+    if (guestCookies.length > 1 || this.guestToken !== value) {
+      await this.removeCookie('gt');
+      await this.setCookie('gt', value);
+    }
+    this.guestToken = value;
+    if (this.guestCreatedAt == null) {
+      this.guestCreatedAt = new Date();
+    }
+    return value;
   }
 
   protected async setCookie(key: string, value: string): Promise<void> {
@@ -351,6 +376,7 @@ export class TwitterGuestAuth implements TwitterAuth {
     this.guestToken = newGuestToken;
     this.guestCreatedAt = new Date();
 
+    await this.removeCookie('gt');
     await this.setCookie('gt', newGuestToken);
 
     log(`Updated guest token: ${newGuestToken}`);
