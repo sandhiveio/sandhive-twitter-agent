@@ -255,9 +255,14 @@ export class TwitterUserAuth extends TwitterGuestAuth {
     twoFactorSecret?: string,
   ): Promise<void> {
     await this.preflight();
-    await this.adoptGuestTokenCookie();
+    // The login page may set a gt cookie that api.x.com will not accept.
+    // Drop it and take the token from guest/activate.json, then keep that
+    // single value in both the cookie and x-guest-token.
+    await this.removeCookie('gt');
+    this.deleteToken();
+    await this.updateGuestToken();
     if (!this.guestToken) {
-      await this.updateGuestToken();
+      throw new AuthenticationError('guest_token not found.');
     }
 
     const credentials: TwitterUserAuthCredentials = {
