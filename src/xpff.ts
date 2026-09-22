@@ -83,21 +83,23 @@ export class XPFFHeaderGenerator {
 const xpffBaseKey =
   '0e6be1f1e21ffc33590b888fd4dc81b19713e570e805d4e5df80a493c9571a05';
 
-function xpffPlain(): string {
+function xpffPlain(userAgent: string): string {
   const timestamp = Date.now();
   return JSON.stringify({
     navigator_properties: {
       hasBeenActive: 'true',
-      userAgent:
-        'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/137.0.0.0 Safari/537.36',
+      userAgent,
       webdriver: 'false',
     },
     created_at: timestamp,
   });
 }
 
-export async function generateXPFFHeader(guestId: string): Promise<string> {
+export async function generateXPFFHeader(
+  guestId: string,
+  userAgent: string,
+): Promise<string> {
   const generator = new XPFFHeaderGenerator(xpffBaseKey);
-  const plaintext = xpffPlain();
+  const plaintext = xpffPlain(userAgent);
   return generator.generateHeader(plaintext, guestId);
 }

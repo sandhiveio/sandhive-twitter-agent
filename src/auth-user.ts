@@ -10,6 +10,10 @@ import * as OTPAuth from 'otpauth';
 import { FetchParameters } from './api-types';
 import debug from 'debug';
 import { generateXPFFHeader } from './xpff';
+import {
+  applyClientProfile,
+  clientProfileFromOptions,
+} from './client-profile';
 import { generateTransactionId } from './xctxid';
 
 const log = debug('twitter-scraper:auth-user');
@@ -250,7 +254,10 @@ export class TwitterUserAuth extends TwitterGuestAuth {
     email?: string,
     twoFactorSecret?: string,
   ): Promise<void> {
-    await this.updateGuestToken();
+    await this.preflight();
+    if (!this.guestToken) {
+      await this.updateGuestToken();
+    }
 
     const credentials: TwitterUserAuthCredentials = {
       username,
@@ -284,6 +291,45 @@ export class TwitterUserAuth extends TwitterGuestAuth {
     }
   }
 
+  /**
+   * Visit the login page the way a browser does, and take the guest token
+   * from the inline `gt` cookie when the HTML includes one.
+   */
+  private async preflight(): Promise<void> {
+    try {
+      const headers = new Headers({
+        accept:
+          'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7',
+        'sec-fetch-dest': 'document',
+        'sec-fetch-mode': 'navigate',
+        'sec-fetch-user': '?1',
+        'upgrade-insecure-requests': '1',
+      });
+      applyClientProfile(
+        headers,
+        clientProfileFromOptions(this.options),
+        'none',
+      );
+
+      log('Pre-flight: fetching https://x.com/i/flow/login');
+      const res = await this.fetch('https://x.com/i/flow/login', {
+        redirect: 'follow',
+        headers,
+      });
+      await updateCookieJar(this.jar, res.headers);
+
+      const html = await res.text();
+      const gtMatch = html.match(/document\.cookie="gt=(\d+)/);
+      if (gtMatch) {
+        this.guestToken = gtMatch[1];
+        this.guestCreatedAt = new Date();
+        await this.setCookie('gt', gtMatch[1]);
+      }
+    } catch (err) {
+      log('Pre-flight request failed (non-fatal):', err);
+    }
+  }
+
   async logout(): Promise<void> {
     if (!this.hasToken()) {
       return;
@@ -312,10 +358,8 @@ export class TwitterUserAuth extends TwitterGuestAuth {
     // Use the override token if provided, otherwise use the instance's bearer token
     const tokenToUse = bearerTokenOverride ?? this.bearerToken;
     headers.set('authorization', `Bearer ${tokenToUse}`);
-    headers.set(
-      'user-agent',
-      'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/135.0.0.0 Safari/537.36',
-    );
+    const profile = clientProfileFromOptions(this.options);
+    applyClientProfile(headers, profile);
 
     if (this.guestToken) {
       // Guest token is optional for authenticated users
@@ -327,7 +371,7 @@ export class TwitterUserAuth extends TwitterGuestAuth {
     if (this.options?.experimental?.xpff) {
       const guestId = await this.guestId();
       if (guestId != null) {
-        const xpffHeader = await generateXPFFHeader(guestId);
+        const xpffHeader = await generateXPFFHeader(guestId, profile.userAgent);
         headers.set('x-xp-forwarded-for', xpffHeader);
       }
     }
@@ -348,9 +392,7 @@ export class TwitterUserAuth extends TwitterGuestAuth {
     this.removeCookie('twitter_ads_idb=');
     this.removeCookie('email_uid=');
     this.removeCookie('external_referer=');
-    this.removeCookie('ct0=');
     this.removeCookie('aa_u=');
-    this.removeCookie('__cf_bm=');
 
     return await this.executeFlowTask({
       flow_name: 'login',
@@ -358,7 +400,7 @@ export class TwitterUserAuth extends TwitterGuestAuth {
         flow_context: {
           debug_overrides: {},
           start_location: {
-            location: 'unknown',
+            location: 'manual_link',
           },
         },
       },
@@ -600,35 +642,35 @@ private async handleSuccessSubtask(
     log(`Making POST request to ${onboardingTaskUrl}`);
     const headers = new Headers({
       accept: '*/*',
-      'accept-language': 'en-US,en;q=0.9',
       'content-type': 'application/json',
-      'cache-control': 'no-cache',
       origin: 'https://x.com',
-      pragma: 'no-cache',
       priority: 'u=1, i',
       referer: 'https://x.com/',
-      'sec-ch-ua':
-        '"Google Chrome";v="135", "Not-A.Brand";v="8", "Chromium";v="135"',
-      'sec-ch-ua-mobile': '?0',
-      'sec-ch-ua-platform': '"Windows"',
       'sec-fetch-dest': 'empty',
       'sec-fetch-mode': 'cors',
-      'sec-fetch-site': 'same-origin',
-      'user-agent':
-        'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/135.0.0.0 Safari/537.36',
-      'x-twitter-auth-type': 'OAuth2Client',
       'x-twitter-active-user': 'yes',
       'x-twitter-client-language': 'en',
     });
-    await this.installTo(headers, onboardingTaskUrl);
+    applyClientProfile(
+      headers,
+      clientProfileFromOptions(this.options),
+      'same-site',
+    );
+    await this.installAuthCredentials(headers);
 
     if (this.options?.experimental?.xClientTransactionId) {
       const transactionId = await generateTransactionId(
         onboardingTaskUrl,
         this.fetch.bind(this),
         'POST',
+        clientProfileFromOptions(this.options),
       );
       headers.set('x-client-transaction-id', transactionId);
+    }
+
+    const bodyData: Record<string, unknown> = { ...data };
+    if ('flow_name' in bodyData) {
+      delete bodyData.flow_name;
     }
 
     let res: Response;
@@ -639,7 +681,7 @@ private async handleSuccessSubtask(
           credentials: 'include',
           method: 'POST',
           headers: headers,
-          body: JSON.stringify(data),
+          body: JSON.stringify(bodyData),
         },
       ];
 

@@ -2,6 +2,7 @@ import { Cookie } from 'tough-cookie';
 import { bearerToken, FetchTransformOptions, RequestApiResult } from './api';
 import { TwitterAuth, TwitterAuthOptions, TwitterGuestAuth } from './auth';
 import { FlowSubtaskHandler, TwitterUserAuth } from './auth-user';
+import { ClientProfile, BrowserProfile, browserProfileForAccount, clientProfileForAccount } from './client-profile';
 import { getProfile, getUserIdByScreenName, Profile } from './profile';
 import {
   fetchSearchProfiles,
@@ -86,7 +87,23 @@ export interface ScraperOptions {
      * Enables the generation of the `x-xp-forwarded-for` header on requests. This may resolve some errors.
      */
     xpff: boolean;
+    /**
+     * Per-account device profile for Castle token generation.
+     * TLS and User-Agent stay on the shared Chrome fingerprint.
+     */
+    browserProfile?: BrowserProfile;
   };
+
+  /**
+   * Stable account id used to choose a Chrome client profile. The same id
+   * always maps to the same profile.
+   */
+  clientProfileSeed?: string;
+
+  /**
+   * Explicit client profile. Wins over {@link clientProfileSeed}.
+   */
+  clientProfile?: ClientProfile;
 }
 
 /**
@@ -97,13 +114,28 @@ export class Scraper {
   private auth!: TwitterAuth;
   private authTrends!: TwitterAuth;
   private token: string;
+  private readonly options?: Partial<ScraperOptions>;
 
   /**
    * Creates a new Scraper object.
    * - Scrapers maintain their own guest tokens for Twitter's internal API.
    * - Reusing Scraper objects is recommended to minimize the time spent authenticating unnecessarily.
    */
-  constructor(private readonly options?: Partial<ScraperOptions>) {
+  constructor(options?: Partial<ScraperOptions>) {
+    const clientProfile =
+      options?.clientProfile ??
+      clientProfileForAccount(options?.clientProfileSeed ?? 'default');
+    const browserProfile =
+      options?.experimental?.browserProfile ??
+      browserProfileForAccount(options?.clientProfileSeed ?? 'default');
+    this.options = {
+      ...options,
+      clientProfile,
+      experimental: {
+        ...options?.experimental,
+        browserProfile,
+      },
+    };
     this.token = bearerToken;
     this.useGuestAuth();
   }
@@ -657,7 +689,9 @@ export class Scraper {
       experimental: {
         xClientTransactionId: this.options?.experimental?.xClientTransactionId,
         xpff: this.options?.experimental?.xpff,
+        browserProfile: this.options?.experimental?.browserProfile,
       },
+      clientProfile: this.options?.clientProfile,
     };
   }
 

@@ -34,6 +34,12 @@ describe('TwitterUserAuth', () => {
         ),
       headers: new Headers(),
     } as Response,
+    preflight: {
+      ok: true,
+      status: 200,
+      text: () => Promise.resolve('<html></html>'),
+      headers: new Headers(),
+    } as Response,
     guestToken: {
       ok: true,
       json: () => Promise.resolve({ guest_token: 'test-guest-token' }),
@@ -112,7 +118,7 @@ describe('TwitterUserAuth', () => {
   };
 
   const mockLoginFlow = (subtasks: string[]) => {
-    // Guest token fetch
+    mockFetch.mockResolvedValueOnce(mockResponses.preflight);
     mockFetch.mockResolvedValueOnce(mockResponses.guestToken);
 
     // initLogin: task endpoint returns first subtask
@@ -131,6 +137,7 @@ describe('TwitterUserAuth', () => {
   const setupAuthenticatedState = async () => {
     // Use a minimal login flow that goes straight to success
     mockFetch
+      .mockResolvedValueOnce(mockResponses.preflight)
       .mockResolvedValueOnce(mockResponses.guestToken)
       .mockResolvedValueOnce(
         mockResponses.subtask('token1', 'LoginSuccessSubtask'),
@@ -149,18 +156,29 @@ describe('TwitterUserAuth', () => {
       mockLoginFlow(loginFlows.standard);
       await auth.login('testuser', 'testpass');
 
-      // Guest token + 4 subtask calls = 5 total
-      expect(mockFetch).toHaveBeenCalledTimes(5);
-      expect(mockFetch.mock.calls[0][0]).toBe(
+      expect(mockFetch).toHaveBeenCalledTimes(6);
+      expect(mockFetch.mock.calls[0][0]).toBe('https://x.com/i/flow/login');
+      expect(mockFetch.mock.calls[1][0]).toBe(
         'https://api.x.com/1.1/guest/activate.json',
       );
-      expect(mockFetch.mock.calls[1][0]).toBe(
+      expect(mockFetch.mock.calls[2][0]).toBe(
         'https://api.x.com/1.1/onboarding/task.json?flow_name=login',
+      );
+      const loginHeaders = mockFetch.mock.calls[2][1].headers;
+      expect(loginHeaders.get('user-agent')).toContain('Chrome/144.0.0.0');
+      expect(loginHeaders.get('sec-ch-ua')).toContain('"Google Chrome";v="144"');
+      expect(loginHeaders.get('sec-fetch-site')).toBe('same-site');
+      expect(loginHeaders.get('x-twitter-auth-type')).toBeNull();
+      const loginBody = JSON.parse(mockFetch.mock.calls[2][1].body);
+      expect(loginBody.flow_name).toBeUndefined();
+      expect(loginBody.input_flow_data.flow_context.start_location.location).toBe(
+        'manual_link',
       );
     });
 
     it('should handle login failure', async () => {
       mockFetch
+        .mockResolvedValueOnce(mockResponses.preflight)
         .mockResolvedValueOnce(mockResponses.guestToken)
         .mockResolvedValueOnce(mockResponses.error(99, 'Invalid credentials'));
 
@@ -171,6 +189,7 @@ describe('TwitterUserAuth', () => {
 
     it('should handle DenyLoginSubtask flow', async () => {
       mockFetch
+        .mockResolvedValueOnce(mockResponses.preflight)
         .mockResolvedValueOnce(mockResponses.guestToken)
         .mockResolvedValueOnce(
           mockResponses.subtask('token1', 'DenyLoginSubtask'),
@@ -184,12 +203,12 @@ describe('TwitterUserAuth', () => {
     it('should handle 2FA challenge', async () => {
       mockLoginFlow(loginFlows.twoFactor);
       await auth.login('testuser', 'testpass', undefined, 'JBSWY3DPEHPK3PXP');
-      // Guest token + 5 subtask calls = 6 total
-      expect(mockFetch).toHaveBeenCalledTimes(6);
+      expect(mockFetch).toHaveBeenCalledTimes(7);
     });
 
     it('should retry 2FA challenge after failure', async () => {
       mockFetch
+        .mockResolvedValueOnce(mockResponses.preflight)
         .mockResolvedValueOnce(mockResponses.guestToken)
         // initLogin
         .mockResolvedValueOnce(
@@ -205,11 +224,12 @@ describe('TwitterUserAuth', () => {
         );
 
       await auth.login('testuser', 'testpass', undefined, 'JBSWY3DPEHPK3PXP');
-      expect(mockFetch).toHaveBeenCalledTimes(4);
+      expect(mockFetch).toHaveBeenCalledTimes(5);
     });
 
     it('should handle all 2FA attempts failing', async () => {
       mockFetch
+        .mockResolvedValueOnce(mockResponses.preflight)
         .mockResolvedValueOnce(mockResponses.guestToken)
         // initLogin returns 2FA challenge
         .mockResolvedValueOnce(
@@ -229,6 +249,7 @@ describe('TwitterUserAuth', () => {
 
     it('should handle missing TOTP secret during 2FA challenge', async () => {
       mockFetch
+        .mockResolvedValueOnce(mockResponses.preflight)
         .mockResolvedValueOnce(mockResponses.guestToken)
         // initLogin returns 2FA challenge
         .mockResolvedValueOnce(
@@ -242,6 +263,7 @@ describe('TwitterUserAuth', () => {
 
     it('should handle invalid TOTP secret during 2FA challenge', async () => {
       mockFetch
+        .mockResolvedValueOnce(mockResponses.preflight)
         .mockResolvedValueOnce(mockResponses.guestToken)
         // initLogin returns 2FA challenge
         .mockResolvedValueOnce(
@@ -255,6 +277,7 @@ describe('TwitterUserAuth', () => {
 
     it('should handle invalid subtask type', async () => {
       mockFetch
+        .mockResolvedValueOnce(mockResponses.preflight)
         .mockResolvedValueOnce(mockResponses.guestToken)
         .mockResolvedValueOnce(
           mockResponses.subtask('token1', 'UnknownSubtask'),
@@ -267,6 +290,7 @@ describe('TwitterUserAuth', () => {
 
     it('should handle network errors', async () => {
       mockFetch
+        .mockResolvedValueOnce(mockResponses.preflight)
         .mockResolvedValueOnce(mockResponses.guestToken)
         // initLogin fails on task endpoint
         .mockRejectedValueOnce(new Error('Network error'));
@@ -278,6 +302,7 @@ describe('TwitterUserAuth', () => {
 
     it('should handle invalid response format', async () => {
       mockFetch
+        .mockResolvedValueOnce(mockResponses.preflight)
         .mockResolvedValueOnce(mockResponses.guestToken)
         .mockResolvedValueOnce({
           ok: true,
@@ -291,6 +316,7 @@ describe('TwitterUserAuth', () => {
 
     it('should handle rate limit errors', async () => {
       mockFetch
+        .mockResolvedValueOnce(mockResponses.preflight)
         .mockResolvedValueOnce(mockResponses.guestToken)
         // initLogin gets rate limited
         .mockResolvedValueOnce(
@@ -304,6 +330,7 @@ describe('TwitterUserAuth', () => {
 
     it('should handle unauthorized errors', async () => {
       mockFetch
+        .mockResolvedValueOnce(mockResponses.preflight)
         .mockResolvedValueOnce(mockResponses.guestToken)
         // initLogin gets 401 error
         .mockResolvedValueOnce(

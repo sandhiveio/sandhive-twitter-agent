@@ -1,5 +1,10 @@
 import fetch from 'cross-fetch';
 import debug from 'debug';
+import {
+  applyClientProfile,
+  ClientProfile,
+  defaultClientProfile,
+} from './client-profile';
 
 const log = debug('twitter-scraper:xctxid');
 
@@ -31,27 +36,24 @@ async function parseHTML(html: string): Promise<Window & typeof globalThis> {
 
 // Adapted from https://github.com/Lqm1/x-client-transaction-id/blob/main/utils.ts
 // to support the scraper's custom (and potentially proxied) fetch function.
-export async function fetchXDocument(fetchFn: typeof fetch): Promise<Document> {
+export async function fetchXDocument(
+  fetchFn: typeof fetch,
+  profile: ClientProfile = defaultClientProfile(),
+): Promise<Document> {
   // Set headers to mimic a browser request
-  const headers = {
+  const headers: Record<string, string> = {
     accept:
       'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7',
-    'accept-language': 'ja',
     'cache-control': 'no-cache',
     pragma: 'no-cache',
     priority: 'u=0, i',
-    'sec-ch-ua':
-      '"Google Chrome";v="135", "Not-A.Brand";v="8", "Chromium";v="135"',
-    'sec-ch-ua-mobile': '?0',
-    'sec-ch-ua-platform': '"Windows"',
     'sec-fetch-dest': 'document',
     'sec-fetch-mode': 'navigate',
     'sec-fetch-site': 'none',
     'sec-fetch-user': '?1',
     'upgrade-insecure-requests': '1',
-    'user-agent':
-      'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/135.0.0.0 Safari/537.36',
   };
+  applyClientProfile(headers, profile, 'none');
 
   // The bare homepage now serves a separate logged-out app which does not
   // contain the responsive-web runtime or its ondemand chunk map. The /home
@@ -89,12 +91,16 @@ export async function generateTransactionId(
   url: string,
   fetchFn: typeof fetch,
   method: 'GET' | 'POST',
+  profile?: ClientProfile,
 ) {
   const parsedUrl = new URL(url);
   const path = parsedUrl.pathname;
 
   log(`Generating transaction ID for ${method} ${path}`);
-  const document = await fetchXDocument(fetchFn);
+  const document = await fetchXDocument(
+    fetchFn,
+    profile ?? defaultClientProfile(),
+  );
   const ClientTransactionClass = await clientTransaction();
   const transaction = await ClientTransactionClass.create(document);
   const transactionId = await transaction.generateTransactionId(method, path);

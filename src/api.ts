@@ -71,7 +71,9 @@ export async function requestApi<T>(
   log(`Making ${method} request to ${url}`);
 
   await auth.installTo(headers, url, bearerTokenOverride);
-  await platform.randomizeCiphers?.();
+  if (!auth.options?.clientProfile) {
+    await platform.randomizeCiphers?.();
+  }
 
   // Add common web headers to more closely mirror the official client
   if (!headers.has('x-twitter-active-user')) {
@@ -89,6 +91,7 @@ export async function requestApi<T>(
       url,
       auth.fetch.bind(auth),
       method,
+      auth.options?.clientProfile,
     );
     headers.set('x-client-transaction-id', transactionId);
   }

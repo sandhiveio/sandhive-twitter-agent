@@ -46,6 +46,20 @@ export {
   ErrorRateLimitStrategy,
 } from './rate-limit';
 export { Scraper, type ScraperOptions } from './scraper';
+export {
+  clientProfileForAccount,
+  browserProfileForAccount,
+  chromeClientProfile,
+  defaultClientProfile,
+  CHROME_JA3,
+  CHROME_JA4R,
+  CHROME_HTTP2_FINGERPRINT,
+  CHROME_HEADER_ORDER,
+  CHROME_USER_AGENT,
+  CHROME_SEC_CH_UA,
+  type ClientProfile,
+  type BrowserProfile,
+} from './client-profile';
 export { SearchMode } from './search';
 export type { QueryProfilesResponse, QueryTweetsResponse } from './timeline-v1';
 export { createTweet } from './tweets';

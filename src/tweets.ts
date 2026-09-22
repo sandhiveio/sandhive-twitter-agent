@@ -18,6 +18,10 @@ import { getTweetTimeline } from './timeline-async';
 import { apiRequestFactory } from './api-data';
 import { ListTimeline, parseListTimelineTweets } from './timeline-list';
 import { AuthenticationError } from './errors';
+import {
+  applyClientProfile,
+  clientProfileFromOptions,
+} from './client-profile';
 import { Headers } from 'headers-polyfill';
 import debug from 'debug';
 
@@ -507,28 +511,21 @@ export async function createTweet(
   const createTweetRequest = apiRequestFactory.createCreateTweetRequest();
   const headers = new Headers({
     accept: '*/*',
-    'accept-language': 'ru',
     'content-type': 'application/json',
     origin: 'https://x.com',
     referer: 'https://x.com/compose/post',
     priority: 'u=1, i',
-    'sec-ch-ua': '"Not;A=Brand";v="99", "Opera";v="123", "Chromium";v="139"',
-    'sec-ch-ua-arch': 'x86',
-    'sec-ch-ua-bitness': '64',
-    'sec-ch-ua-full-version': '123.0.5669.47',
-    'sec-ch-ua-full-version-list':
-      '"Not;A=Brand";v="99.0.0.0", "Opera";v="123.0.5669.47", "Chromium";v="139.0.7258.156"',
-    'sec-ch-ua-mobile': '?0',
-    'sec-ch-ua-model': '""',
-    'sec-ch-ua-platform': 'Windows',
-    'sec-ch-ua-platform-version': '15.0.0',
     'sec-fetch-dest': 'empty',
     'sec-fetch-mode': 'cors',
-    'sec-fetch-site': 'same-origin',
     'x-twitter-active-user': 'yes',
     'x-twitter-auth-type': 'OAuth2Session',
     'x-twitter-client-language': 'en',
   });
+  applyClientProfile(
+    headers,
+    clientProfileFromOptions(auth.options),
+    'same-site',
+  );
 
   const variables: Record<string, unknown> = {
     tweet_text: text,

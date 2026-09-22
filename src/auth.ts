@@ -11,6 +11,12 @@ import {
 import { AuthenticationError } from './errors';
 import debug from 'debug';
 import { generateXPFFHeader } from './xpff';
+import {
+  applyClientProfile,
+  BrowserProfile,
+  ClientProfile,
+  clientProfileFromOptions,
+} from './client-profile';
 
 const log = debug('twitter-scraper:auth');
 
@@ -21,7 +27,13 @@ export interface TwitterAuthOptions {
   experimental: {
     xClientTransactionId?: boolean;
     xpff?: boolean;
+    browserProfile?: BrowserProfile;
   };
+  /**
+   * Browser identity for this account. Stable across runs when chosen with
+   * {@link clientProfileForAccount}.
+   */
+  clientProfile?: ClientProfile;
 }
 
 export interface TwitterAuth {
@@ -204,17 +216,15 @@ export class TwitterGuestAuth implements TwitterAuth {
     }
 
     headers.set('authorization', `Bearer ${tokenToUse}`);
-    headers.set(
-      'user-agent',
-      'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/135.0.0.0 Safari/537.36',
-    );
+    const profile = clientProfileFromOptions(this.options);
+    applyClientProfile(headers, profile);
 
     await this.installCsrfToken(headers);
 
     if (this.options?.experimental?.xpff) {
       const guestId = await this.guestId();
       if (guestId != null) {
-        const xpffHeader = await generateXPFFHeader(guestId);
+        const xpffHeader = await generateXPFFHeader(guestId, profile.userAgent);
         headers.set('x-xp-forwarded-for', xpffHeader);
       }
     }
@@ -228,6 +238,18 @@ export class TwitterGuestAuth implements TwitterAuth {
     if (xCsrfToken) {
       headers.set('x-csrf-token', xCsrfToken.value);
     }
+  }
+
+  /**
+   * Bearer, guest token, and cookies only.
+   * The login task must not also get csrf, xpff, or x-twitter-auth-type.
+   */
+  async installAuthCredentials(headers: Headers): Promise<void> {
+    headers.set('authorization', `Bearer ${this.bearerToken}`);
+    if (this.guestToken) {
+      headers.set('x-guest-token', this.guestToken);
+    }
+    headers.set('cookie', await this.getCookieString());
   }
 
   protected async setCookie(key: string, value: string): Promise<void> {
@@ -296,6 +318,11 @@ export class TwitterGuestAuth implements TwitterAuth {
       Authorization: `Bearer ${this.bearerToken}`,
       Cookie: await this.getCookieString(),
     });
+    applyClientProfile(
+      headers,
+      clientProfileFromOptions(this.options),
+      'same-site',
+    );
 
     log(`Making POST request to ${guestActivateUrl}`);
 
