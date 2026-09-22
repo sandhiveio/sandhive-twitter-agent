@@ -82,11 +82,11 @@ export interface ScraperOptions {
     /**
      * Enables the generation of the `x-client-transaction-id` header on requests. This may resolve some errors.
      */
-    xClientTransactionId: boolean;
+    xClientTransactionId?: boolean;
     /**
      * Enables the generation of the `x-xp-forwarded-for` header on requests. This may resolve some errors.
      */
-    xpff: boolean;
+    xpff?: boolean;
     /**
      * Per-account device profile for Castle token generation.
      * TLS and User-Agent stay on the shared Chrome fingerprint.
