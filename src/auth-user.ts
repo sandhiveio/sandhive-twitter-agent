@@ -255,14 +255,11 @@ export class TwitterUserAuth extends TwitterGuestAuth {
     twoFactorSecret?: string,
   ): Promise<void> {
     await this.preflight();
-    // The login page may set a gt cookie that api.x.com will not accept.
-    // Drop it and take the token from guest/activate.json, then keep that
-    // single value in both the cookie and x-guest-token.
-    await this.removeCookie('gt');
-    this.deleteToken();
-    await this.updateGuestToken();
+    // A browser takes the guest token from the login page HTML and does not
+    // call guest/activate.json. Activate is only the fallback when that
+    // inline document.cookie="gt=..." assignment is missing.
     if (!this.guestToken) {
-      throw new AuthenticationError('guest_token not found.');
+      await this.updateGuestToken();
     }
 
     const credentials: TwitterUserAuthCredentials = {
@@ -324,11 +321,6 @@ export class TwitterUserAuth extends TwitterGuestAuth {
       });
       await updateCookieJar(this.jar, res.headers);
 
-      const fromJar = await this.adoptGuestTokenCookie();
-      if (fromJar) {
-        return;
-      }
-
       const html = await res.text();
       const gtMatch = html.match(/document\.cookie="gt=(\d+)/);
       if (gtMatch) {
@@ -336,6 +328,7 @@ export class TwitterUserAuth extends TwitterGuestAuth {
         this.guestCreatedAt = new Date();
         await this.removeCookie('gt');
         await this.setCookie('gt', gtMatch[1]);
+        log(`Extracted guest token from HTML (length: ${gtMatch[1].length})`);
       }
     } catch (err) {
       log('Pre-flight request failed (non-fatal):', err);

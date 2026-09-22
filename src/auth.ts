@@ -243,10 +243,16 @@ export class TwitterGuestAuth implements TwitterAuth {
   /**
    * Bearer, guest token, and cookies only.
    * The login task must not also get csrf, xpff, or x-twitter-auth-type.
-   * x-guest-token is taken from the gt cookie so the header and cookie match.
+   * When a guest token is already known, the gt cookie is rewritten to it.
+   * A Set-Cookie gt from the login page is not used in its place.
    */
   async installAuthCredentials(headers: Headers): Promise<void> {
-    await this.adoptGuestTokenCookie();
+    if (this.guestToken) {
+      await this.removeCookie('gt');
+      await this.setCookie('gt', this.guestToken);
+    } else {
+      await this.adoptGuestTokenCookie();
+    }
     headers.set('authorization', `Bearer ${this.bearerToken}`);
     if (this.guestToken) {
       headers.set('x-guest-token', this.guestToken);
