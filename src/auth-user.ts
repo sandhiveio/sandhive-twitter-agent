@@ -10,10 +10,7 @@ import * as OTPAuth from 'otpauth';
 import { FetchParameters } from './api-types';
 import debug from 'debug';
 import { generateXPFFHeader } from './xpff';
-import {
-  applyClientProfile,
-  clientProfileFromOptions,
-} from './client-profile';
+import { applyClientProfile, clientProfileFromOptions } from './client-profile';
 import { generateTransactionId } from './xctxid';
 
 const log = debug('twitter-scraper:auth-user');
@@ -270,6 +267,23 @@ export class TwitterUserAuth extends TwitterGuestAuth {
     };
 
     let next: FlowTokenResult = await this.initLogin();
+    if (this.isBadGuestToken(next)) {
+      // Tokens embedded in the login page occasionally arrive expired or are
+      // rejected when a proxy exits through a different edge. Discard every
+      // copy of that token, activate a fresh one, and restart the login flow
+      // once. Retrying a subtask with a new guest token would leave the old
+      // flow token bound to the rejected guest session.
+      log('Login rejected the preflight guest token; activating a fresh token');
+      await this.removeCookie('gt');
+      this.deleteToken();
+      await this.updateGuestToken();
+      if (!this.guestToken) {
+        throw new AuthenticationError(
+          'Unable to refresh rejected guest token.',
+        );
+      }
+      next = await this.initLogin();
+    }
     while (next.status === 'success' && next.response.subtasks?.length) {
       const flowToken = next.response.flow_token;
       if (flowToken == null) {
@@ -292,6 +306,19 @@ export class TwitterUserAuth extends TwitterGuestAuth {
     if (next.status === 'error') {
       throw next.err;
     }
+  }
+
+  private isBadGuestToken(result: FlowTokenResult): boolean {
+    if (result.status !== 'error' || !(result.err instanceof ApiError)) {
+      return false;
+    }
+
+    const errors = result.err.data?.errors;
+    return (
+      result.err.response.status === 403 &&
+      Array.isArray(errors) &&
+      errors.some((error: TwitterApiErrorRaw) => error?.code === 239)
+    );
   }
 
   /**
@@ -620,21 +647,20 @@ export class TwitterUserAuth extends TwitterGuestAuth {
     });
   }
 
-private async handleSuccessSubtask(
-  _subtaskId: string,
-  prev: TwitterUserAuthFlowResponse,
-  _credentials: TwitterUserAuthCredentials,
-  _api: FlowSubtaskHandlerApi,
-): Promise<FlowTokenResult> {
-  return {
-    status: 'success',
-    response: {
-      ...prev,
-      subtasks: [],  
-    },
-  };
-}
-
+  private async handleSuccessSubtask(
+    _subtaskId: string,
+    prev: TwitterUserAuthFlowResponse,
+    _credentials: TwitterUserAuthCredentials,
+    _api: FlowSubtaskHandlerApi,
+  ): Promise<FlowTokenResult> {
+    return {
+      status: 'success',
+      response: {
+        ...prev,
+        subtasks: [],
+      },
+    };
+  }
 
   private async executeFlowTask(
     data: TwitterUserAuthFlowRequest,

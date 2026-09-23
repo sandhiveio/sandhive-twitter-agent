@@ -164,16 +164,18 @@ describe('TwitterUserAuth', () => {
       expect(mockFetch.mock.calls[2][0]).toBe(
         'https://api.x.com/1.1/onboarding/task.json?flow_name=login',
       );
-      const loginHeaders = mockFetch.mock.calls[2][1].headers;
+      const loginHeaders = mockFetch.mock.calls[2][1]!.headers as Headers;
       expect(loginHeaders.get('user-agent')).toContain('Chrome/144.0.0.0');
-      expect(loginHeaders.get('sec-ch-ua')).toContain('"Google Chrome";v="144"');
+      expect(loginHeaders.get('sec-ch-ua')).toContain(
+        '"Google Chrome";v="144"',
+      );
       expect(loginHeaders.get('sec-fetch-site')).toBe('same-site');
       expect(loginHeaders.get('x-twitter-auth-type')).toBeNull();
-      const loginBody = JSON.parse(mockFetch.mock.calls[2][1].body);
+      const loginBody = JSON.parse(mockFetch.mock.calls[2][1]!.body as string);
       expect(loginBody.flow_name).toBeUndefined();
-      expect(loginBody.input_flow_data.flow_context.start_location.location).toBe(
-        'manual_link',
-      );
+      expect(
+        loginBody.input_flow_data.flow_context.start_location.location,
+      ).toBe('manual_link');
     });
 
     it('should handle login failure', async () => {
@@ -185,6 +187,46 @@ describe('TwitterUserAuth', () => {
       await expect(auth.login('testuser', 'wrongpass')).rejects.toThrow(
         'Authentication error (99): Invalid credentials',
       );
+    });
+
+    it('should refresh a preflight guest token rejected by onboarding', async () => {
+      const preflightGuestToken = '1111111111111111111';
+      const badGuestData = {
+        errors: [{ code: 239, message: 'Bad guest token' }],
+      };
+      const badGuestToken = {
+        ok: false,
+        status: 403,
+        statusText: 'Forbidden',
+        headers: new Headers({ 'content-type': 'application/json' }),
+        json: () => Promise.resolve(badGuestData),
+        text: () => Promise.resolve(JSON.stringify(badGuestData)),
+      } as Response;
+
+      mockFetch
+        .mockResolvedValueOnce({
+          ...mockResponses.preflight,
+          text: () =>
+            Promise.resolve(
+              `<script>document.cookie="gt=${preflightGuestToken}; Max-Age=10800"</script>`,
+            ),
+        } as Response)
+        .mockResolvedValueOnce(badGuestToken)
+        .mockResolvedValueOnce(mockResponses.guestToken)
+        .mockResolvedValueOnce(
+          mockResponses.subtask('token1', 'LoginSuccessSubtask'),
+        );
+
+      await auth.login('testuser', 'testpass');
+
+      expect(mockFetch).toHaveBeenCalledTimes(4);
+      expect(mockFetch.mock.calls[2][0]).toBe(
+        'https://api.x.com/1.1/guest/activate.json',
+      );
+      const retryHeaders = mockFetch.mock.calls[3][1]!.headers as Headers;
+      expect(retryHeaders.get('x-guest-token')).toBe('test-guest-token');
+      expect(retryHeaders.get('cookie')).toContain('gt=test-guest-token');
+      expect(retryHeaders.get('cookie')).not.toContain(preflightGuestToken);
     });
 
     it('should handle DenyLoginSubtask flow', async () => {
