@@ -4,7 +4,7 @@ import { jest } from '@jest/globals';
 import { fetchXDocument } from './xctxid';
 
 describe('fetchXDocument', () => {
-  it('fetches the responsive web app from /home with the supplied fetch', async () => {
+  it('fetches the responsive web app from /i/jf/ with the supplied fetch', async () => {
     const fetchFn = jest.fn(
       async () =>
         ({
@@ -18,7 +18,7 @@ describe('fetchXDocument', () => {
     const document = await fetchXDocument(fetchFn);
 
     expect(fetchFn).toHaveBeenCalledWith(
-      'https://x.com/home',
+      'https://x.com/i/jf/',
       expect.objectContaining({ headers: expect.any(Object) }),
     );
     expect(
@@ -28,7 +28,7 @@ describe('fetchXDocument', () => {
     ).toBe('key');
   });
 
-  it('reports a failed /home request', async () => {
+  it('reports a failed app shell request', async () => {
     const fetchFn = jest.fn(
       async () =>
         ({
@@ -38,7 +38,7 @@ describe('fetchXDocument', () => {
     ) as unknown as typeof fetch;
 
     await expect(fetchXDocument(fetchFn)).rejects.toThrow(
-      'Failed to fetch X home page: Forbidden',
+      'Failed to fetch X app shell: Forbidden',
     );
   });
 });
