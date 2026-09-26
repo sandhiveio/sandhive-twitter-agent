@@ -55,15 +55,15 @@ export async function fetchXDocument(
   };
   applyClientProfile(headers, profile, 'none');
 
-  // The bare homepage now serves a separate logged-out app which does not
-  // contain the responsive-web runtime or its ondemand chunk map. The /home
-  // route still serves the app shell required by x-client-transaction-id.
-  const response = await fetchFn('https://x.com/home', {
+  // The logged-out /home route now redirects to x-web, which does not contain
+  // the responsive-web runtime or its ondemand chunk map. /i/jf/ still serves
+  // the app shell required by x-client-transaction-id without authentication.
+  const response = await fetchFn('https://x.com/i/jf/', {
     headers,
   });
 
   if (!response.ok) {
-    throw new Error(`Failed to fetch X home page: ${response.statusText}`);
+    throw new Error(`Failed to fetch X app shell: ${response.statusText}`);
   }
 
   const htmlText = await response.text();
