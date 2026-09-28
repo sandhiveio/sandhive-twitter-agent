@@ -91,7 +91,24 @@ const quote = await scraper.createTweet('Worth reading if you are building in pu
 console.log(quote.id, quote.text);
 ```
 
-### 4) Track account-level context
+### 4) Attach a cashtag price chart
+
+`restId` is the composer asset id (`chain:0x…`). Put that same id in the tweet text; X renders it as `$TICKER` with the chart card.
+
+```ts
+const posted = await scraper.createTweet(
+  'ethereum:0x672fdba7055bddfa8fd6bd45b1455ce5eb97f499 test',
+  {
+    cashtagAttachments: [
+      { restId: 'ethereum:0x672fdba7055bddfa8fd6bd45b1455ce5eb97f499' },
+    ],
+  },
+);
+
+console.log(posted.id);
+```
+
+### 5) Track account-level context
 
 ```ts
 const profile = await scraper.getProfile('twitterdev');

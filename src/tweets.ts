@@ -60,6 +60,11 @@ export interface CreateTweetReplyOptions {
   excludeReplyUserIds?: string[];
 }
 
+export interface CreateTweetCashtagAttachment {
+  /** Asset id from the composer, e.g. `ethereum:0x…`. */
+  restId: string;
+}
+
 export interface CreateTweetOptions {
   attachmentUrl?: string;
   disallowedReplyOptions?: string[] | null;
@@ -68,6 +73,13 @@ export interface CreateTweetOptions {
   quoteTweetId?: string;
   reply?: CreateTweetReplyOptions;
   semanticAnnotationIds?: string[];
+  /**
+   * Composer cashtag cards (price chart). `tweet_text` should include the same
+   * `restId` the web client sends; X rewrites it to `$TICKER` when the card attaches.
+   */
+  cashtagAttachments?: CreateTweetCashtagAttachment[];
+  /** Defaults to `Htl` when cashtag attachments are present. */
+  semanticAnnotationSource?: string;
 }
 
 export interface PlaceRaw {
@@ -527,12 +539,23 @@ export async function createTweet(
     'same-site',
   );
 
+  const cashtagAttachments = options?.cashtagAttachments ?? [];
   const variables: Record<string, unknown> = {
     tweet_text: text,
-    dark_request: options?.darkRequest ?? false,
     media: toApiMediaEntities(options?.media),
     semantic_annotation_ids: options?.semanticAnnotationIds ?? [],
   };
+
+  if (cashtagAttachments.length > 0) {
+    variables['cashtag_attachment_options'] = cashtagAttachments.map(
+      (attachment) => ({ rest_id: attachment.restId }),
+    );
+    variables['semantic_annotation_options'] = {
+      source: options?.semanticAnnotationSource ?? 'Htl',
+    };
+  } else {
+    variables['dark_request'] = options?.darkRequest ?? false;
+  }
 
   variables['disallowed_reply_options'] =
     options?.disallowedReplyOptions ?? null;

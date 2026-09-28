@@ -71,6 +71,7 @@ export type {
   PlaceRaw,
   Video,
   CreateTweetOptions,
+  CreateTweetCashtagAttachment,
   CreateTweetMediaEntity,
   CreateTweetMediaOptions,
   CreateTweetReplyOptions,
