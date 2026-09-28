@@ -643,7 +643,16 @@ export async function createTweet(
       createTweetResult,
       tweetResult,
     });
-    throw new Error('Failed to parse created tweet result.');
+    return {
+      id: tweetId,
+      text,
+      hashtags: [],
+      mentions: [],
+      photos: [],
+      thread: [],
+      urls: [],
+      videos: [],
+    };
   }
 
   return parsed;
