@@ -1,4 +1,4 @@
-import { CoreUserRaw, LegacyUserRaw } from './profile';
+import { CoreUserRaw, LegacyUserRaw, SearchUserRaw } from './profile';
 import { parseMediaGroups, reconstructTweetHtml } from './timeline-tweet-util';
 import {
   EditControlInitialRaw,
@@ -13,7 +13,7 @@ import { isFieldDefined } from './type-util';
 
 export interface TimelineUserResultRaw {
   rest_id?: string;
-  legacy?: LegacyUserRaw;
+  legacy?: LegacyUserRaw | null;
   is_blue_verified?: boolean;
 }
 
@@ -58,7 +58,7 @@ export interface SearchEntryItemContentRaw {
   };
   userDisplayType?: string;
   user_results?: {
-    result?: TimelineUserResultRaw;
+    result?: SearchUserRaw;
   };
 }
 
@@ -73,6 +73,7 @@ export interface SearchEntryRaw {
     items?: {
       item?: {
         content?: SearchEntryItemContentRaw;
+        itemContent?: SearchEntryItemContentRaw;
       };
     }[];
     itemContent?: SearchEntryItemContentRaw;
@@ -118,8 +119,8 @@ function getLegacyTweetId(tweet: Readonly<LegacyTweetRaw>): string | undefined {
 
 export function parseLegacyTweet(
   coreUser?: Readonly<CoreUserRaw>,
-  user?: Readonly<LegacyUserRaw>,
-  tweet?: Readonly<LegacyTweetRaw>,
+  user?: Readonly<LegacyUserRaw> | null,
+  tweet?: Readonly<LegacyTweetRaw> | null,
   editControl?: Readonly<EditControlInitialRaw>,
 ): ParseTweetResult {
   if (tweet == null) {
@@ -369,7 +370,8 @@ export function parseTimelineEntryItemContentRaw(
     isTweetResult ||
     (result?.__typename === 'TweetWithVisibilityResults' && result?.tweet)
   ) {
-    if (result?.__typename === 'TweetWithVisibilityResults') result = result.tweet;
+    if (result?.__typename === 'TweetWithVisibilityResults')
+      result = result.tweet;
 
     if (isTweetResult && !result?.__typename) {
       result = { ...result, __typename: 'Tweet' };

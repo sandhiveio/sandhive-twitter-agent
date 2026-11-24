@@ -9,6 +9,26 @@ export interface CoreUserRaw {
   screen_name?: string;
 }
 
+export interface SearchUserRaw {
+  rest_id?: string;
+  core?: CoreUserRaw;
+  legacy?: LegacyUserRaw | null;
+  avatar?: { image_url?: string };
+  banner?: { image_url?: string };
+  profile_bio?: {
+    description?: string;
+    entities?: LegacyUserRaw['entities'];
+  };
+  location?: { location?: string };
+  privacy?: { protected?: boolean };
+  verification?: { verified?: boolean };
+  relationship_counts?: { followers?: number; following?: number };
+  tweet_counts?: { tweets?: number; media_tweets?: number };
+  pinned_items?: { tweet_ids_str?: string[] };
+  action_counts?: { favorites_count?: number };
+  is_blue_verified?: boolean;
+}
+
 export interface LegacyUserRaw {
   created_at?: string;
   description?: string;

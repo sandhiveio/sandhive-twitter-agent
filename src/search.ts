@@ -95,6 +95,14 @@ async function getSearchTimeline(
   }
 
   const searchTimelineRequest = apiRequestFactory.createSearchTimelineRequest();
+  Object.assign(searchTimelineRequest.features, {
+    creator_subscriptions_quote_tweet_preview_enabled: false,
+    responsive_web_graphql_exclude_directive_enabled: true,
+    responsive_web_media_download_video_enabled: false,
+    rweb_video_timestamps_enabled: true,
+    tweet_with_visibility_results_prefer_gql_media_interstitial_enabled: false,
+    tweetypie_unmention_optimization_enabled: true,
+  });
   searchTimelineRequest.variables.rawQuery = query;
   searchTimelineRequest.variables.count = maxItems;
   searchTimelineRequest.variables.querySource = 'typed_query';

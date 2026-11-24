@@ -1,4 +1,10 @@
-import { CoreUserRaw, LegacyUserRaw, parseProfile, Profile } from './profile';
+import {
+  CoreUserRaw,
+  LegacyUserRaw,
+  parseProfile,
+  Profile,
+  SearchUserRaw,
+} from './profile';
 import { parseMediaGroups, reconstructTweetHtml } from './timeline-tweet-util';
 import { PlaceRaw, Tweet } from './tweets';
 import { isFieldDefined } from './type-util';
@@ -57,16 +63,12 @@ export interface EditControlInitialRaw {
   is_edit_eligible?: boolean;
 }
 
-export interface SearchResultRaw {
+export interface SearchResultRaw extends LegacyTweetRaw {
   rest_id?: string;
   __typename?: string;
   core?: {
     user_results?: {
-      result?: {
-        is_blue_verified?: boolean;
-        core?: CoreUserRaw;
-        legacy?: LegacyUserRaw;
-      };
+      result?: SearchUserRaw;
     };
   };
   edit_control?: {
@@ -85,7 +87,8 @@ export interface SearchResultRaw {
   quoted_status_result?: {
     result?: SearchResultRaw;
   };
-  legacy?: LegacyTweetRaw;
+  legacy?: LegacyTweetRaw | null;
+  tweet?: SearchResultRaw;
 }
 
 export interface TimelineResultRaw {
@@ -100,7 +103,7 @@ export interface TimelineResultRaw {
         __typename?: string;
         is_blue_verified?: boolean;
         core?: CoreUserRaw;
-        legacy?: LegacyUserRaw;
+        legacy?: LegacyUserRaw | null;
       };
     };
   };
@@ -117,7 +120,7 @@ export interface TimelineResultRaw {
   quoted_status_result?: {
     result?: TimelineResultRaw;
   };
-  legacy?: LegacyTweetRaw;
+  legacy?: LegacyTweetRaw | null;
   tweet?: TimelineResultRaw;
 }
 
